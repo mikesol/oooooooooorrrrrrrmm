@@ -149,7 +149,8 @@ pureScript info = do
           log $ "Reading query from " <> queryPath
           queryText <- readTextFile Encoding.UTF8 queryPath
           let systemM = DoPurescript.system
-          let moduleName = pascalCase q
+          let moduleFileName = pascalCase q
+          let moduleName = info.prefix <> "." <> pascalCase q
           let userM = DoPurescript.user (DoPurescript.Schema schema) (DoPurescript.Query queryText) (DoPurescript.ModuleName moduleName)
           ChatCompletionResponse { choices } <- createCompletions
             $ over ChatCompletionRequest
@@ -170,7 +171,7 @@ pureScript info = do
           else do
             log "Creating PureScript file"
             -- now it's safe to write the query
-            let newModulePath = Path.concat ([ info.ps ] <> splitPrefix <> [ moduleName <> ".purs" ])
+            let newModulePath = Path.concat ([ info.ps ] <> splitPrefix <> [ moduleFileName <> ".purs" ])
             writeTextFile Encoding.UTF8 newModulePath result
             pure $ Loop $ Array.drop 1 queryArr
 
