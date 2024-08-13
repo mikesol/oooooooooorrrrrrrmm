@@ -1,0 +1,24 @@
+package:
+  name: oooooooooorrrrrrrmm
+  dependencies:
+    - aff
+    - argparse-basic
+    - console
+    - effect
+    - filterable
+    - maybe
+    - node-child-process
+    - node-fs
+    - node-path
+    - node-readline
+    - prelude
+    - random
+    - strings-extra
+    - yoga-json
+  test:
+    main: Test.Main
+    dependencies: []
+workspace:
+  packageSet:
+    registry: 56.4.0
+  extraPackages: {}

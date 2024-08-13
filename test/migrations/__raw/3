@@ -1,0 +1,15 @@
+-- Migration to create a trigger to delete all friend entries for a deleted user
+
+-- First, we will create the function that will execute on DELETE of a user
+CREATE OR REPLACE FUNCTION delete_friends_for_user() RETURNS TRIGGER AS $$
+BEGIN
+    DELETE FROM friends WHERE asker = OLD.id OR receiver = OLD.id;
+    RETURN OLD;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Now we will create the trigger that calls this function
+CREATE TRIGGER on_user_delete
+AFTER DELETE ON users
+FOR EACH ROW
+EXECUTE FUNCTION delete_friends_for_user();

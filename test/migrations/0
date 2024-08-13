@@ -1,0 +1,3 @@
+Create a user table containing a primary id,
+an optional email field, a required first name field, and a
+required last name field. Also create username and please make this unique.

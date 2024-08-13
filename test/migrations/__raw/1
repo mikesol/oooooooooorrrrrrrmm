@@ -1,0 +1,17 @@
+-- Migration to modify users table and create friends table
+
+-- Adding a verified column to the users table
+ALTER TABLE users
+ADD COLUMN verified BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- Setting the verified field to false for existing users
+UPDATE users SET verified = FALSE;
+
+-- Creating the friends table
+CREATE TABLE friends (
+    id SERIAL PRIMARY KEY,
+    asker INTEGER NOT NULL,
+    receiver INTEGER NOT NULL,
+    FOREIGN KEY (asker) REFERENCES users (id) ON DELETE CASCADE,
+    FOREIGN KEY (receiver) REFERENCES users (id) ON DELETE CASCADE
+);
