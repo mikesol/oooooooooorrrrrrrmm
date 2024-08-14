@@ -152,3 +152,5 @@ You can generate TypeScript bindings for all your queries by running:
 ```bash
 OPENAI_API_KEY=<my-key> pnpm oooooooooorrrrrrrmm typescript -m migrations -q queries
 ```
+
+To use `zod` validation in the bindings, add `-v zod`. To use `io-ts` validation, add `-v io-ts`.
