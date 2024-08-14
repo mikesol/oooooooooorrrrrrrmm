@@ -9,7 +9,7 @@ import Data.CodePoint.Unicode (isAlphaNum, isUpper)
 import Data.Either (Either(..))
 import Data.Filterable (filter, filterMap)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (over)
 import Data.String (codePointFromChar)
@@ -24,7 +24,7 @@ import Node.Buffer (toString)
 import Node.ChildProcess (exec')
 import Node.Encoding (Encoding(..))
 import Node.Encoding as Encoding
-import Node.FS.Aff (mkdir, readTextFile, readdir, writeTextFile)
+import Node.FS.Aff (mkdir, readTextFile, readdir, unlink, writeTextFile)
 import Node.FS.Sync (exists)
 import Node.Path (FilePath)
 import Node.Path as Path
@@ -35,6 +35,63 @@ import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), close
 import OOOOOOOOOORRRRRRRMM.Prompts.DoPurescript as DoPurescript
 import Safe.Coerce (coerce)
 import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
+
+dehallucinate :: DoPurescript.ModuleName -> String -> String
+dehallucinate (DoPurescript.ModuleName moduleName) s = firstPart <> secondPart
+
+  where
+  iIsEmpty = isJust $ String.indexOf (String.Pattern "type I = {}") s
+  input = if iIsEmpty then "" else " I ->"
+  inputVar = if iIsEmpty then "" else " i "
+  nDollars = Array.length (String.split (String.Pattern "$") (String.splitAt (fromMaybe 0 $ String.indexOf (String.Pattern "type Q") s) s).before) - 1
+  inputImpl
+    | nDollars == 0 = ""
+    | otherwise = String.joinWith ", "
+        $ map (\i -> "writeImpl i.\"$" <> writeJSON i <> "\"")
+        $ (1 .. nDollars)
+  oIsEmpty = isJust $ String.indexOf (String.Pattern "type O = {}") s
+  hasDate = isJust $ String.indexOf (String.Pattern "Date") s
+  hasMaybe = isJust $ String.indexOf (String.Pattern "Maybe") s
+  jsonImport = if oIsEmpty then "import Yoga.JSON (writeImpl)\n" else "import Yoga.JSON (read, writeImpl, E)\n"
+  dateImport = if hasDate then "import Data.Date (Date)\n" else ""
+  maybeImport = if hasMaybe then "import Data.Maybe (Maybe)\n" else ""
+  firstPart = String.replace (String.Pattern (moduleName <> " where")) (String.Replacement (moduleName <> " where\n\nimport Prelude\nimport Effect.Aff (Aff)\nimport Data.Symbol (reflectSymbol)\nimport Type.Proxy (Proxy(..))\nimport Foreign (Foreign)\n" <> jsonImport <> dateImport <> maybeImport))
+    $ String.replace (String.Pattern "<purescript>") (String.Replacement "")
+    $ String.replace (String.Pattern "</purescript>") (String.Replacement "")
+    $ String.replace (String.Pattern "```") (String.Replacement "")
+    $ String.replace (String.Pattern "```purescript") (String.Replacement "")
+    $ String.replace (String.Pattern "type I = {}") (String.Replacement "")
+    $ String.replace (String.Pattern "type O = {}") (String.Replacement "") s
+  secondPart
+    | oIsEmpty =
+        """
+run :: (String -> Foreign -> Aff Foreign) ->""" <> input
+          <>
+            """ Aff Unit
+run go """
+          <> inputVar
+          <>
+            """= do
+  void $ go (reflectSymbol (Proxy :: _ Q)) $ writeImpl ([ """
+          <> inputImpl
+          <>
+            """ ] :: Array Foreign)
+"""
+    | otherwise =
+        """
+run :: (String -> Foreign -> Aff Foreign) ->""" <> input
+          <>
+            """ Aff (E O)
+run go """
+          <> inputVar
+          <>
+            """= do
+  o <- go (reflectSymbol (Proxy :: _ Q)) $ writeImpl ([ """
+          <> inputImpl
+          <>
+            """] :: Array Foreign)
+  pure $ read o
+"""
 
 newtype QueryResult = QueryResult { result :: String, success :: Boolean }
 
@@ -84,8 +141,11 @@ pureScript info = do
   when (not $ coerce prefixIsValid) do
     throwError $ error "The prefix must be a valid purescript module name."
   pthExists <- liftEffect $ exists info.ps
-  when (not pthExists) do
+  if (not pthExists) then do
     void $ mkdir info.ps
+  else do
+    dc <- readdir $ Path.concat $ [ info.ps ] <> splitPrefix
+    for_ dc \f -> unlink $ Path.concat $ [ info.ps ] <> splitPrefix <> [ f ]
   for_ (1 .. Array.length splitPrefix) \ix -> do
     let xpth = Path.concat $ [ info.ps ] <> Array.take ix splitPrefix
     xpthExists <- liftEffect $ exists xpth
@@ -172,7 +232,7 @@ pureScript info = do
             log "Creating PureScript file"
             -- now it's safe to write the query
             let newModulePath = Path.concat ([ info.ps ] <> splitPrefix <> [ moduleFileName <> ".purs" ])
-            writeTextFile Encoding.UTF8 newModulePath result
+            writeTextFile Encoding.UTF8 newModulePath $ dehallucinate (DoPurescript.ModuleName moduleName) result
             pure $ Loop $ Array.drop 1 queryArr
 
   tailRecM go (filter (flip Array.elem queryPaths) rawQPaths)

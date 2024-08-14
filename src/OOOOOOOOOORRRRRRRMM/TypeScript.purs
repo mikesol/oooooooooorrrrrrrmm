@@ -19,7 +19,7 @@ import Node.Buffer (toString)
 import Node.ChildProcess (exec')
 import Node.Encoding (Encoding(..))
 import Node.Encoding as Encoding
-import Node.FS.Aff (mkdir, readTextFile, readdir, writeTextFile)
+import Node.FS.Aff (mkdir, readTextFile, readdir, unlink, writeTextFile)
 import Node.FS.Sync (exists)
 import Node.Path (FilePath)
 import Node.Path as Path
@@ -65,8 +65,11 @@ migrationsStartAt0AndIncreaseBy1 = go 0
 typescript :: Typescript -> Aff Unit
 typescript info = do
   pthExists <- liftEffect $ exists info.ts
-  when (not pthExists) do
+  if (not pthExists) then do
     void $ mkdir info.ts
+  else do
+    dc <- readdir info.ts
+    for_ dc \f -> unlink $ Path.concat [ info.ts, f ]
   console <- liftEffect $ createConsoleInterface noCompletion
   migrationPaths <- readdir info.migrations
   let migrations = filterMap readJSON_ migrationPaths

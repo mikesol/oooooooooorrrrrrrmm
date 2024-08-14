@@ -30,11 +30,11 @@ Please generate PureScript bindings for this query. The bindings should follow t
 
 <purescript>
 module """ <> moduleName <> """ where
--- extra imports if needed
 
 type I = ... -- input type
 type Q = """<> "\"\"\"\n" <> query <>"\n\"\"\"" <> """
 type O = ... -- output type
+
 </purescript>
 
 As you can see, the query Q just needs to be quoted verbatim, as PureScript allows for typelevel strings.
@@ -47,11 +47,15 @@ type I = { "$1" :: String, "$2" :: Boolean }
 
 Note that the input type's keys _must_ be quoted.
 
+If there is no input, the type of I _must_ be {}.
+
 For O, this should be an array of rows, each of which represents an entry. For example, if the columns returned are an id string, a verified boolean, and an optional email string, the output type should be:
 
 <purescript>
-type O = Array { id :: String, verified :: Boolean, email :: Nullable String }
+type O = Array { id :: String, verified :: Boolean, email :: Maybe String }
 </purescript>
+
+If there is no output, the type of O _must_ be {}.
 
 For each postgres type, here is the equivalent PureScript type:
 
@@ -67,14 +71,9 @@ For each postgres type, here is the equivalent PureScript type:
 - date -> Date
 - timestamp -> Date
 
-Arrays should be arrays of these things. Stuff that can be `null` types should be Nullable types of these things.
+Arrays should be arrays of these things. Stuff that can be `null` types should be Maybe in I and O.
 
-The following PureScript types are not primitive and will need an extra import statement if and only if the type is used. Please do not include the import if the type is not used.
-- Foreign -> import Foreign (Foreign)
-- Date -> import Data.Date (Date)
-- Nullable -> import Data.Nullable (Nullable)
-
-Please generate the complete PureScript file with nothing extra (success=true). If you cant, please send back why (success=false).
+Please generate the complete PureScript file with nothing extra (success=true). Do not put it in backticks or xml, just the raw PureScript file. If you cant, please send back why (success=false).
 """
 
 responseFormat :: Foreign
