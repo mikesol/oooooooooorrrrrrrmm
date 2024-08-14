@@ -31,6 +31,7 @@ type Typescript =
   }
 
 type Schema = { migrations :: String, path :: String, humanReadable :: Boolean }
+type Question = { migrations :: String, question :: String }
 
 data Arrrrrgs
   = Migrate Migrate
@@ -38,6 +39,7 @@ data Arrrrrgs
   | PureScript PureScript
   | Typescript Typescript
   | Schema Schema
+  | Question Question
 
 derive instance Generic Arrrrrgs _
 
@@ -144,7 +146,20 @@ schema = command [ "schema", "s" ] "Export the schema." do
           # boolean
     }
 
+question ∷ ArgParser Question
+question = command [ "ask", "a" ] "Ask a question." do
+  flagHelp *> fromRecord
+    { question:
+        argument
+          [ "--question", "-q" ]
+          "The question to ask."
+    , migrations:
+        argument
+          [ "--migrations", "-m" ]
+          "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
+          # default "migrations"
+    }
 parser :: ArgParser Arrrrrgs
 parser = choose
   "command"
-  [ Migrate <$> migrate, Query <$> query, PureScript <$> pureScript, Typescript <$> typescript, Schema <$> schema ]
+  [ Migrate <$> migrate, Query <$> query, PureScript <$> pureScript, Typescript <$> typescript, Schema <$> schema, Question <$> question ]

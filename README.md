@@ -143,6 +143,14 @@ OPENAI_API_KEY=<my-key> pnpm oooooooooorrrrrrrmm schema -m migrations -p schema.
 
 The schema is the raw one output by postgres. To make it more human readable, add the `--legible` or `-l` flag to the command.
 
+### Question
+
+You can ask an arbitrary question about your schema by running:
+
+```bash
+OPENAI_API_KEY=<my-key> pnpm oooooooooorrrrrrrmm schema -m migrations -a "What are the tables in this app"`
+```
+
 ### PureScript bindings
 
 You can generate PureScript bindings for all your queries by running:

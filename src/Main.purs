@@ -15,7 +15,7 @@ import OOOOOOOOOORRRRRRRMM.PureScript (pureScript)
 import OOOOOOOOOORRRRRRRMM.Query (query)
 import OOOOOOOOOORRRRRRRMM.Schema (schema)
 import OOOOOOOOOORRRRRRRMM.TypeScript (typescript)
-
+import OOOOOOOOOORRRRRRRMM.Question (question)
 main :: Effect Unit
 main = do
   args <- argv
@@ -26,3 +26,4 @@ main = do
     Right (PureScript p) -> launchAff_ do pureScript p
     Right (Typescript t) -> launchAff_ do typescript t
     Right (Schema s) -> launchAff_ do schema s
+    Right (Question s) -> launchAff_ do question s
