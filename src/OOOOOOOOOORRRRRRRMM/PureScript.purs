@@ -58,6 +58,7 @@ dehallucinate (DoPurescript.ModuleName moduleName) s = firstPart <> secondPart
   firstPart = String.replace (String.Pattern (moduleName <> " where")) (String.Replacement (moduleName <> " where\n\nimport Prelude\nimport Effect.Aff (Aff)\nimport Data.Symbol (reflectSymbol)\nimport Type.Proxy (Proxy(..))\nimport Foreign (Foreign)\n" <> jsonImport <> dateImport <> maybeImport))
     $ String.replace (String.Pattern "<purescript>") (String.Replacement "")
     $ String.replace (String.Pattern "</purescript>") (String.Replacement "")
+    $ String.replace (String.Pattern "\ntypescript\n") (String.Replacement "")
     $ String.replace (String.Pattern "```") (String.Replacement "")
     $ String.replace (String.Pattern "```purescript") (String.Replacement "")
     $ String.replace (String.Pattern "type I = {}") (String.Replacement "")

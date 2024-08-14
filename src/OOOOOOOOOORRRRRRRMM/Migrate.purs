@@ -86,13 +86,15 @@ goQ migrationIx info schema migrationResult { todo, done } = Array.head todo # m
   log $ "Potentially revising query in " <> queryPath
   let rawQueryFile = Path.concat [ info.queries, "__raw", queryPath ]
   queryText <- readTextFile Encoding.UTF8 rawQueryFile
+  let intentionFile = Path.concat [ info.queries, queryPath ]
+  intentionText <- readTextFile Encoding.UTF8 intentionFile
   let contextPath = Path.concat [ info.context, queryPath, writeJSON migrationIx ]
   contextExists <- liftEffect $ exists contextPath
   context <-
     if contextExists then Just <<< AdditionalContext <$> readTextFile Encoding.UTF8 contextPath
     else pure Nothing
   let systemM = FixQuery.system
-  let userM = FixQuery.user (FixQuery.Sql schema) (FixQuery.Migration migrationResult) (FixQuery.Query queryText) context
+  let userM = FixQuery.user (FixQuery.Sql schema) (FixQuery.Migration migrationResult) (FixQuery.Intention intentionText) (FixQuery.Query queryText) context
   ChatCompletionResponse { choices } <- createCompletions
     $ over ChatCompletionRequest
         _
@@ -112,7 +114,7 @@ goQ migrationIx info schema migrationResult { todo, done } = Array.head todo # m
       log $ "You can add context to the query by creating a file with free-form text at " <> contextPath <> " and run the migration again."
     pure $ Done $ Left unit
   else do
-    log $ "The query " <> queryPath <> " was " <> if not revised then "not in need of revision." else "revisded."
+    log $ "The query " <> queryPath <> " was " <> if not revised then "not in need of revision." else "revised."
     pure $ Loop $ { todo: Array.drop 1 todo, done: done <> [ queryPath /\ result ] }
 
 migrate :: Migrate -> Aff Unit

@@ -37,18 +37,16 @@ type O = ... // output type
 
 As you can see, the query Q just needs to be quoted verbatim, as Typescript allows for typelevel strings. Ditto for `q`.
 
-For I, this should be an object with as many entries as there are input, with the same labels as in the query. For example, if the query has wildcards $1 and $2, where $1 is supposed to be a string and $2 is supposed to be a boolean, the input type should be:
+For I, this should be a tuple with as many entries as there are input. For example, if the query has wildcards $1 and $2, where $1 is supposed to be a string and $2 is supposed to be a boolean, the input type should be:
 
 <typescript>
-type I = { "$1": string, "$2": boolean }
+export type I = [string, boolean];
 </typescript>
-
-Note that the input type's keys _must_ be quoted.
 
 For O, this should be an array of rows, each of which represents an entry. For example, if the columns returned are an id string, a verified boolean, and an optional email string, the output type should be:
 
 <typescript>
-type O = { id: string, verified: boolean, email?: string }[];
+export type O = { id: string, verified: boolean, email?: string }[];
 </typescript>
 
 For each postgres type, here is the equivalent Typescript type:

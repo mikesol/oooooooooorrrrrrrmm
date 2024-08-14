@@ -8,8 +8,9 @@ import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Filterable (compact, filter, filterMap)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), maybe)
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Newtype (over)
+import Data.String as String
 import Data.String.Extra (kebabCase, pascalCase)
 import Effect.Aff (Aff, error, makeAff, throwError)
 import Effect.Class (liftEffect)
@@ -24,15 +25,110 @@ import Node.FS.Sync (exists)
 import Node.Path (FilePath)
 import Node.Path as Path
 import Node.ReadLine (close, createConsoleInterface, noCompletion)
-import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Typescript)
+import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Typescript, Validator(..))
 import OOOOOOOOOORRRRRRRMM.OpenAI (ChatCompletionRequest(..), ChatCompletionResponse(..), ResponseFormat(..), ccr, createCompletions, message, system, user)
 import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), closeClient, newClient, parsePostgresUrl, runSqlCommand)
 import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript as DoTypescript
+import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript.DoIoTs as DoIoTs
+import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript.DoZod as DoZod
 import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
 
 newtype QueryResult = QueryResult { result :: String, success :: Boolean }
 
 derive newtype instance ReadForeign QueryResult
+
+dehallucinate :: Maybe Validator -> String -> String
+dehallucinate mv ss = go mv
+  $ String.replace (String.Pattern "```typescript") (String.Replacement "")
+  $ String.replace (String.Pattern "<typescript>") (String.Replacement "")
+  $ String.replace (String.Pattern "</typescript>") (String.Replacement "")
+  $ String.replace (String.Pattern "\ntypescript\n") (String.Replacement "")
+  $ String.replace (String.Pattern "```") (String.Replacement "") ss
+  where
+  go (Just Zod) s = (if zodIsImported then "" else "import { z } from 'zod';")
+    <>
+      ( if usesJson then
+          """
+const literalSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
+type Literal = z.infer<typeof literalSchema>;
+type Json = Literal | { [key: string]: Json } | Json[];
+const json: z.ZodType<Json> = z.lazy(() =>
+  z.union([literalSchema, z.array(json), z.record(json)])
+);
+
+"""
+        else ""
+      )
+    <> String.replace (String.Pattern "z.json()") (String.Replacement "json") s
+    <>
+      ( """
+export const run = (f: (s: string, v: any) => Promise<any>) => (input: z.infer<typeof i>) => f(q, input).then(x => o.parse(x));
+"""
+      )
+    where
+    zodIsImported = isJust (String.indexOf (String.Pattern "from 'zod'") s) || isJust (String.indexOf (String.Pattern "from \"zod\"") s)
+    usesJson = isJust (String.indexOf (String.Pattern "z.json") s)
+  go (Just IoTs) s = (if ioTsIsImported then "" else "import * as t from 'io-ts';")
+    <>
+      ( if usesDate then
+          """
+function isInstanceOf<T>(ctor: new (...args: any[]) => T) {
+  return new t.Type<T, T, unknown>(
+    'InstanceOf',
+    (u: unknown): u is T => u instanceof ctor,
+    (u, c) => (u instanceof ctor ? t.success(u) : t.failure(u, c)),
+    t.identity
+  );
+}
+
+const date = isInstanceOf(Date);
+
+"""
+        else ""
+      )
+    <>
+      ( if usesJson then
+          """
+const json = t.recursion('Json', () =>
+  t.union([t.null, t.boolean, t.string, t.number, t.array(json), t.record(t.string, json)])
+)
+"""
+        else ""
+      ) <> ("""
+type TupleFn = <TCodecs extends readonly [...t.Mixed[]]>(
+  codecs: TCodecs,
+  name?: string,
+) => t.TupleType<
+  {
+    -readonly [K in keyof TCodecs]: TCodecs[K];
+  },
+  {
+    [K in keyof TCodecs]: TCodecs[K] extends t.Mixed
+      ? t.TypeOf<TCodecs[K]>
+      : unknown;
+  },
+  {
+    [K in keyof TCodecs]: TCodecs[K] extends t.Mixed
+      ? t.OutputOf<TCodecs[K]>
+      : unknown;
+  }
+>;
+const tuple: TupleFn = t.tuple as any;
+""")
+    <> String.replace (String.Pattern "t.json") (String.Replacement "json")
+      ( String.replace (String.Pattern "t.date") (String.Replacement "date")
+          (String.replace (String.Pattern "t.tuple") (String.Replacement "tuple") s)
+      )
+    <>
+      ( """
+  export const run = (f: (s: string, v: any) => Promise<any>) => (input: t.TypeOf<typeof i>) => f(q, input).then(x => o.decode(x));
+"""
+      )
+    where
+    ioTsIsImported = isJust (String.indexOf (String.Pattern "from 'io-ts'") s) || isJust (String.indexOf (String.Pattern "from \"io-ts\"") s)
+    usesJson = isJust (String.indexOf (String.Pattern "t.json") s)
+    usesDate = isJust (String.indexOf (String.Pattern "t.date") s)
+  go Nothing s = s
 
 startInstanceCmd :: String
 startInstanceCmd = "pg_tmp -t"
@@ -85,7 +181,7 @@ typescript info = do
   let rawM = Path.concat [ info.migrations, "__raw" ]
   rawMExists <- liftEffect $ exists rawM
   rawMigrations' <- if not rawMExists then pure [] else readdir rawM
-  let (rawMigrations :: Array Int )= Array.sort $ compact $ map readJSON_ rawMigrations'
+  let (rawMigrations :: Array Int) = Array.sort $ compact $ map readJSON_ rawMigrations'
   log "Starting postgres 🤓"
   url <- makeAff \f -> do
     void $ exec' startInstanceCmd identity \{ error: e, stdout } -> case e of
@@ -124,9 +220,17 @@ typescript info = do
           let queryPath = Path.concat [ info.queries, "__raw", q ]
           log $ "Reading query from " <> queryPath
           queryText <- readTextFile Encoding.UTF8 queryPath
-          let systemM = DoTypescript.system
+          let
+            systemM = case info.validator of
+              Just Zod -> DoZod.system
+              Just IoTs -> DoIoTs.system
+              Nothing -> DoTypescript.system
           let moduleName = pascalCase q
-          let userM = DoTypescript.user (DoTypescript.Schema schema) (DoTypescript.Query queryText)
+          let
+            userM = case info.validator of
+              Just Zod -> DoZod.user (DoZod.Schema schema) (DoZod.Query queryText)
+              Just IoTs -> DoIoTs.user (DoIoTs.Schema schema) (DoIoTs.Query queryText)
+              Nothing -> DoTypescript.user (DoTypescript.Schema schema) (DoTypescript.Query queryText)
           ChatCompletionResponse { choices } <- createCompletions
             $ over ChatCompletionRequest
                 _
@@ -147,7 +251,7 @@ typescript info = do
             log "Creating Typescript file"
             -- now it's safe to write the query
             let newModulePath = Path.concat ([ info.ts ] <> [ moduleName <> ".ts" ])
-            writeTextFile Encoding.UTF8 newModulePath result
+            writeTextFile Encoding.UTF8 newModulePath $ dehallucinate info.validator result
             pure $ Loop $ Array.drop 1 queryArr
 
   tailRecM go (filter (flip Array.elem queryPaths) rawQPaths)

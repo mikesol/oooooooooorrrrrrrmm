@@ -2,9 +2,17 @@ module OOOOOOOOOORRRRRRRMM.Arrrrrgs where
 
 import Prelude
 
-import ArgParse.Basic (ArgParser, argument, boolean, choose, command, default, flag, flagHelp, fromRecord, int)
+import ArgParse.Basic (ArgParser, argument, boolean, choose, command, default, flag, flagHelp, fromRecord, int, optional)
 import Data.Generic.Rep (class Generic)
+import Data.Maybe (Maybe(..))
 import Data.Show.Generic (genericShow)
+
+data Validator = Zod | IoTs
+
+derive instance Generic Validator _
+
+instance Show Validator where
+  show = genericShow
 
 type Migrate =
   { migrations :: String
@@ -28,6 +36,7 @@ type Typescript =
   { queries :: String
   , migrations :: String
   , ts :: String
+  , validator :: Maybe Validator
   }
 
 type Schema = { migrations :: String, path :: String, humanReadable :: Boolean }
@@ -128,6 +137,16 @@ typescript = command [ "typescript", "ts" ] "Create typescript bindings." do
           [ "--path", "-p" ]
           "The path to your Typescript queries, ie src/queries"
           # default "src/queries"
+    , validator:
+        argument
+          [ "--validator", "-v" ]
+          "The validator to use. Valid values are `zod`` and `io-ts`."
+          # optional
+          <#> case _ of
+            Just "zod" -> Just Zod
+            Just "io-ts" -> Just IoTs
+            _ -> Nothing
+
     }
 
 schema ∷ ArgParser Schema

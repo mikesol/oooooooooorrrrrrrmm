@@ -1,0 +1,3 @@
+Add a date_joined column to users, setting the default to now if not provided. It can't be null.
+
+Also, add a settings column to users. This column can be a json type. It can be null.

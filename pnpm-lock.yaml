@@ -17,13 +17,16 @@ importers:
       pg:
         specifier: ^8.12.0
         version: 8.12.0
-      zod:
-        specifier: ^3.23.8
-        version: 3.23.8
     devDependencies:
       esbuild:
         specifier: ^0.23.0
         version: 0.23.0
+      fp-ts:
+        specifier: ^2.16.9
+        version: 2.16.9
+      io-ts:
+        specifier: ^2.2.21
+        version: 2.2.21(fp-ts@2.16.9)
       prettier:
         specifier: ^3.3.3
         version: 3.3.3
@@ -39,6 +42,9 @@ importers:
       typescript:
         specifier: ^5.5.4
         version: 5.5.4
+      zod:
+        specifier: ^3.23.8
+        version: 3.23.8
 
 packages:
 
@@ -525,6 +531,9 @@ packages:
     resolution: {integrity: sha512-0iirZp3uVDjVGt9p49aTaqjk84TrglENEDuqfdlZQ1roC9CWlPk6Avf8EEnZNcAqPonwkG35x4n3ww/1THYAeQ==}
     engines: {node: '>= 12.20'}
 
+  fp-ts@2.16.9:
+    resolution: {integrity: sha512-+I2+FnVB+tVaxcYyQkHUq7ZdKScaBlX53A41mxQtpIccsfyv8PzdzP7fzp2AY832T4aoK6UZ5WRX/ebGd8uZuQ==}
+
   from2@2.3.0:
     resolution: {integrity: sha512-OMcX/4IC/uqEPVgGeyfN22LJk6AZrMkRZHxcHBMBvHScDGgwTm2GT2Wkgtocyd3JfZffjj2kYUDXXII0Fk9W0g==}
 
@@ -621,6 +630,11 @@ packages:
 
   ini@1.3.8:
     resolution: {integrity: sha512-JV/yugV2uzW5iMRSiZAyDtQd+nxtUnjeLt0acNdw98kKLrvuRVyB80tsREOE7yvGVgalhZ6RNXCmEHkUKBKxew==}
+
+  io-ts@2.2.21:
+    resolution: {integrity: sha512-zz2Z69v9ZIC3mMLYWIeoUcwWD6f+O7yP92FMVVaXEOSZH1jnVBmET/urd/uoarD1WGBY4rCj8TAyMPzsGNzMFQ==}
+    peerDependencies:
+      fp-ts: ^2.5.0
 
   ip-address@9.0.5:
     resolution: {integrity: sha512-zHtQzGojZXTwZTHQqra+ETKd4Sn3vgi7uBmlPoXVWZqYvuKmtI0l/VZTjqGmJY9x88GGOaZ9+G9ES8hC4T4X8g==}
@@ -1767,6 +1781,8 @@ snapshots:
       node-domexception: 1.0.0
       web-streams-polyfill: 4.0.0-beta.3
 
+  fp-ts@2.16.9: {}
+
   from2@2.3.0:
     dependencies:
       inherits: 2.0.4
@@ -1875,6 +1891,10 @@ snapshots:
   inherits@2.0.4: {}
 
   ini@1.3.8: {}
+
+  io-ts@2.2.21(fp-ts@2.16.9):
+    dependencies:
+      fp-ts: 2.16.9
 
   ip-address@9.0.5:
     dependencies:
