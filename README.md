@@ -133,6 +133,16 @@ Sometimes, a query may still be relevant but there are multiple ways it could be
 
 You can provide this context by creating a file `context/<query-name>/<migration>`, for example `context/get-verified-users/42` for the `42` migration and the query `get-verified-users`. Then, rerun the migration command.
 
+### Schema
+
+You can generate the full schema for all your migrations by running:
+
+```bash
+OPENAI_API_KEY=<my-key> pnpm oooooooooorrrrrrrmm schema -m migrations -p schema.sql
+```
+
+The schema is the raw one output by postgres. To make it more human readable, add the `--legible` or `-l` flag to the command.
+
 ### PureScript bindings
 
 You can generate PureScript bindings for all your queries by running:

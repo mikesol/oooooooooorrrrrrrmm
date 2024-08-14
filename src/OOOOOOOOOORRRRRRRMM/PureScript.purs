@@ -97,10 +97,6 @@ newtype QueryResult = QueryResult { result :: String, success :: Boolean }
 
 derive newtype instance ReadForeign QueryResult
 
-newtype FixQueryResult = FixQueryResult { result :: String, success :: Boolean, revised :: Boolean }
-
-derive newtype instance ReadForeign FixQueryResult
-
 startInstanceCmd :: String
 startInstanceCmd = "pg_tmp -t"
 
@@ -222,7 +218,7 @@ pureScript info = do
                   , response_format = pure $ ResponseFormat DoPurescript.responseFormat
                   }
                 ccr
-          QueryResult { result, success } <- maybe (throwError $ error "No migration could be generated") pure do
+          QueryResult { result, success } <- maybe (throwError $ error "No PureScript could be generated") pure do
             { message: { content } } <- choices !! 0
             content >>= readJSON_
           if not success then do

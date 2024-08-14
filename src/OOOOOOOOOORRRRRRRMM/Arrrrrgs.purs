@@ -2,7 +2,7 @@ module OOOOOOOOOORRRRRRRMM.Arrrrrgs where
 
 import Prelude
 
-import ArgParse.Basic (ArgParser, argument, choose, command, default, flagHelp, fromRecord)
+import ArgParse.Basic (ArgParser, argument, boolean, choose, command, default, flag, flagHelp, fromRecord)
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 
@@ -30,11 +30,14 @@ type Typescript =
   , ts :: String
   }
 
+type Schema = { migrations :: String, path :: String, humanReadable :: Boolean }
+
 data Arrrrrgs
   = Migrate Migrate
   | Query Query
   | PureScript PureScript
   | Typescript Typescript
+  | Schema Schema
 
 derive instance Generic Arrrrrgs _
 
@@ -121,7 +124,27 @@ typescript = command [ "typescript", "ts" ] "Create typescript bindings." do
           # default "src/queries"
     }
 
+schema ∷ ArgParser Schema
+schema = command [ "schema", "s" ] "Export the schema." do
+  flagHelp *> fromRecord
+    { path:
+        argument
+          [ "--path", "-p" ]
+          "The file to export the schema to."
+          # default "schema.sql"
+    , migrations:
+        argument
+          [ "--migrations", "-m" ]
+          "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
+          # default "migrations"
+    , humanReadable:
+        flag
+          [ "--legible", "-l" ]
+          "Make the schema human readable, getting rid of Postgres gunk."
+          # boolean
+    }
+
 parser :: ArgParser Arrrrrgs
 parser = choose
   "command"
-  [ Migrate <$> migrate, Query <$> query, PureScript <$> pureScript, Typescript <$> typescript ]
+  [ Migrate <$> migrate, Query <$> query, PureScript <$> pureScript, Typescript <$> typescript, Schema <$> schema ]

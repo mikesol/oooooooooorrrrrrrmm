@@ -13,6 +13,7 @@ import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Arrrrrgs(..), parser)
 import OOOOOOOOOORRRRRRRMM.Migrate (migrate)
 import OOOOOOOOOORRRRRRRMM.PureScript (pureScript)
 import OOOOOOOOOORRRRRRRMM.Query (query)
+import OOOOOOOOOORRRRRRRMM.Schema (schema)
 import OOOOOOOOOORRRRRRRMM.TypeScript (typescript)
 
 main :: Effect Unit
@@ -24,3 +25,4 @@ main = do
     Right (Query q) -> launchAff_ do query q
     Right (PureScript p) -> launchAff_ do pureScript p
     Right (Typescript t) -> launchAff_ do typescript t
+    Right (Schema s) -> launchAff_ do schema s
