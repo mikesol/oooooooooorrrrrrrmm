@@ -64,44 +64,23 @@ Create your new migrations in increasing order, counting up from 0.
 
 Then just run the same command and the new migrations will be generated in the `__raw` folder.
 
-You can apply these migrations to your db sequentially by using, for example, a python script.
+### Bootstrap a db
 
-```python
-import psycopg2
-import os
+You can apply these migrations sequentially to your db by running:
 
-# Set up the database connection
-conn = psycopg2.connect(
-    dbname="your_database_name",
-    user="your_username",
-    password="your_password",
-    host="localhost"
-)
-cur = conn.cursor()
-
-# Directory where the migrations are stored
-migrations_dir = 'migrations/__raw'
-
-# Get the list of migration files in sequential order
-migration_files = sorted(os.listdir(migrations_dir), key=lambda x: int(x))
-
-# Apply each migration in sequence
-for migration_file in migration_files:
-    with open(os.path.join(migrations_dir, migration_file), 'r') as file:
-        sql = file.read()
-        try:
-            cur.execute(sql)
-            conn.commit()
-            print(f"Applied migration: {migration_file}")
-        except Exception as e:
-            conn.rollback()
-            print(f"Failed to apply migration {migration_file}: {e}")
-            break
-
-# Close the connection
-cur.close()
-conn.close()
+```bash
+OPENAI_API_KEY=<my-key> pnpm oooooooooorrrrrrrmm bootstrap -m migrations -c 'postgresql://my.connection.string'
 ```
+
+### Bootstrap a db
+
+You can apply these migrations sequentially to a temporary db by running:
+
+```bash
+OPENAI_API_KEY=<my-key> pnpm oooooooooorrrrrrrmm bootstrap-tmp -m migrations
+```
+
+A URL of the temporary DB will be printed to the command line. If you want to set up your temporary DB a particular way, you can pass an `--args` command followed by args to [`pg_tmp`](https://eradman.com/ephemeralpg/).
 
 ### Create a query
 
