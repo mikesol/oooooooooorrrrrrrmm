@@ -32,6 +32,7 @@ type Typescript =
 
 type Schema = { migrations :: String, path :: String, humanReadable :: Boolean }
 type Question = { migrations :: String, question :: String }
+type BootstrapTmp = { args :: String, migrations :: String }
 
 data Arrrrrgs
   = Migrate Migrate
@@ -40,6 +41,7 @@ data Arrrrrgs
   | Typescript Typescript
   | Schema Schema
   | Question Question
+  | BootstrapTmp BootstrapTmp
 
 derive instance Generic Arrrrrgs _
 
@@ -159,7 +161,28 @@ question = command [ "ask", "a" ] "Ask a question." do
           "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
           # default "migrations"
     }
+
+bootstrapTmp ∷ ArgParser BootstrapTmp
+bootstrapTmp = command [ "bootstrap-tmp", "bt" ] "Bootstraps a temporary db with your migrations, printing the url to stdout." do
+  flagHelp *> fromRecord
+    { args:
+        argument
+          [ "--args", "-a" ]
+          "The arguments to pass to pg_tmp." # default " -t", migrations:
+        argument
+          [ "--migrations", "-m" ]
+          "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
+          # default "migrations"
+    }
+
 parser :: ArgParser Arrrrrgs
 parser = choose
   "command"
-  [ Migrate <$> migrate, Query <$> query, PureScript <$> pureScript, Typescript <$> typescript, Schema <$> schema, Question <$> question ]
+  [ Migrate <$> migrate
+  , Query <$> query
+  , PureScript <$> pureScript
+  , Typescript <$> typescript
+  , Schema <$> schema
+  , Question <$> question
+  , BootstrapTmp <$> bootstrapTmp
+  ]

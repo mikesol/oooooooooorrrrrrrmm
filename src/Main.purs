@@ -10,12 +10,14 @@ import Effect.Aff (launchAff_)
 import Effect.Class.Console (log)
 import Node.Process (argv)
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Arrrrrgs(..), parser)
+import OOOOOOOOOORRRRRRRMM.BootstrapTmp (bootstrapTmp)
 import OOOOOOOOOORRRRRRRMM.Migrate (migrate)
 import OOOOOOOOOORRRRRRRMM.PureScript (pureScript)
 import OOOOOOOOOORRRRRRRMM.Query (query)
+import OOOOOOOOOORRRRRRRMM.Question (question)
 import OOOOOOOOOORRRRRRRMM.Schema (schema)
 import OOOOOOOOOORRRRRRRMM.TypeScript (typescript)
-import OOOOOOOOOORRRRRRRMM.Question (question)
+
 main :: Effect Unit
 main = do
   args <- argv
@@ -27,3 +29,4 @@ main = do
     Right (Typescript t) -> launchAff_ do typescript t
     Right (Schema s) -> launchAff_ do schema s
     Right (Question s) -> launchAff_ do question s
+    Right (BootstrapTmp b) -> launchAff_ do bootstrapTmp b
