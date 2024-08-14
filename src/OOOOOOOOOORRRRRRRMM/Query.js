@@ -1,3 +1,4 @@
-import crypto from 'crypto';
+import crypto from "crypto";
 
-export const checksum = (text) => crypto.createHash('md5').update(text, 'utf8').digest('hex');
+export const checksum = (text) =>
+  crypto.createHash("md5").update(text, "utf8").digest("hex");

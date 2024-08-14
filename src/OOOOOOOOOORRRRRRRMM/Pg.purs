@@ -23,14 +23,23 @@ instance Monoid PGVars where
   mempty = pgVarsMempty
 
 foreign import purePgVars :: forall a. a -> PGVars
+
 foreign import newClientImpl
   :: (Error -> Effect Unit) -> (Client -> Effect Unit) -> Host -> Port -> User -> Database -> Effect Unit
+
+foreign import newClientConnectionStringImpl
+  :: (Error -> Effect Unit) -> (Client -> Effect Unit) -> ConnectionString -> Effect Unit
 
 newtype Host = Host String
 newtype Port = Port Int
 newtype User = User String
 newtype Database = Database String
-
+newtype ConnectionString = ConnectionString String
+newClientCS :: ConnectionString -> Aff Client
+newClientCS cs = makeAff \f -> do
+  newClientConnectionStringImpl (f <<< Left) (f <<< Right) cs
+  mempty
+  
 newClient :: Host -> Port -> User -> Database -> Aff Client
 newClient host port string database = makeAff \f -> do
   newClientImpl (f <<< Left) (f <<< Right) host port string database

@@ -10,6 +10,7 @@ import Effect.Aff (launchAff_)
 import Effect.Class.Console (log)
 import Node.Process (argv)
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Arrrrrgs(..), parser)
+import OOOOOOOOOORRRRRRRMM.Bootstrap (bootstrap)
 import OOOOOOOOOORRRRRRRMM.BootstrapTmp (bootstrapTmp)
 import OOOOOOOOOORRRRRRRMM.Migrate (migrate)
 import OOOOOOOOOORRRRRRRMM.PureScript (pureScript)
@@ -30,3 +31,4 @@ main = do
     Right (Schema s) -> launchAff_ do schema s
     Right (Question s) -> launchAff_ do question s
     Right (BootstrapTmp b) -> launchAff_ do bootstrapTmp b
+    Right (Bootstrap b) -> launchAff_ do bootstrap b

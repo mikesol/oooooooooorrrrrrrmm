@@ -5,7 +5,7 @@ import Prelude
 import Data.Array ((!!))
 import Data.Array as Array
 import Data.Either (Either(..))
-import Data.Filterable (filterMap)
+import Data.Filterable (compact, filterMap)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (over)
@@ -66,7 +66,8 @@ schema info = do
     throwError $ error "Migrations must start at 0 and increase by 1."
   let rawM = Path.concat [ info.migrations, "__raw" ]
   rawMExists <- liftEffect $ exists rawM
-  rawMigrations <- if not rawMExists then pure [] else readdir rawM
+  rawMigrations' <- if not rawMExists then pure [] else readdir rawM
+  let (rawMigrations :: Array Int )= Array.sort $ compact $ map readJSON_ rawMigrations'
   log "Starting postgres 🤓"
   url <- makeAff \f -> do
     void $ exec' startInstanceCmd identity \{ error: e, stdout } -> case e of
@@ -80,7 +81,7 @@ schema info = do
     Just x -> pure x
   client <- newClient parsed.host parsed.port parsed.user parsed.database
   for_ rawMigrations \migrationIx -> do
-    let migrationPath = Path.concat [ rawM, migrationIx ]
+    let migrationPath = Path.concat [ rawM, writeJSON migrationIx ]
     log $ "Setting up ephemeral db with migration in " <> migrationPath
     sql <- readTextFile Encoding.UTF8 migrationPath
     void $ runSqlCommand client sql mempty

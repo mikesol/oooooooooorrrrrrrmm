@@ -2,7 +2,7 @@ module OOOOOOOOOORRRRRRRMM.Arrrrrgs where
 
 import Prelude
 
-import ArgParse.Basic (ArgParser, argument, boolean, choose, command, default, flag, flagHelp, fromRecord)
+import ArgParse.Basic (ArgParser, argument, boolean, choose, command, default, flag, flagHelp, fromRecord, int)
 import Data.Generic.Rep (class Generic)
 import Data.Show.Generic (genericShow)
 
@@ -33,6 +33,7 @@ type Typescript =
 type Schema = { migrations :: String, path :: String, humanReadable :: Boolean }
 type Question = { migrations :: String, question :: String }
 type BootstrapTmp = { args :: String, migrations :: String }
+type Bootstrap = { connectionString :: String, migrations :: String, startingMigration :: Int }
 
 data Arrrrrgs
   = Migrate Migrate
@@ -42,6 +43,7 @@ data Arrrrrgs
   | Schema Schema
   | Question Question
   | BootstrapTmp BootstrapTmp
+  | Bootstrap Bootstrap
 
 derive instance Generic Arrrrrgs _
 
@@ -168,11 +170,29 @@ bootstrapTmp = command [ "bootstrap-tmp", "bt" ] "Bootstraps a temporary db with
     { args:
         argument
           [ "--args", "-a" ]
-          "The arguments to pass to pg_tmp." # default " -t", migrations:
+          "The arguments to pass to pg_tmp." # default " -t"
+    , migrations:
         argument
           [ "--migrations", "-m" ]
           "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
           # default "migrations"
+    }
+
+bootstrap ∷ ArgParser Bootstrap
+bootstrap = command [ "bootstrap", "b" ] "Bootstraps a db with your migrations." do
+  flagHelp *> fromRecord
+    { connectionString:
+        argument
+          [ "--connection-string", "-c" ]
+          "The connection string for your db."
+    , migrations:
+        argument
+          [ "--migrations", "-m" ]
+          "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
+          # default "migrations"
+    , startingMigration:
+        argument [ "--starting-migration", "-sm" ]
+          "The migration to start from" # int # default 0
     }
 
 parser :: ArgParser Arrrrrgs
@@ -185,4 +205,5 @@ parser = choose
   , Schema <$> schema
   , Question <$> question
   , BootstrapTmp <$> bootstrapTmp
+  , Bootstrap <$> bootstrap
   ]
