@@ -47,15 +47,15 @@ dehallucinate (DoPurescript.ModuleName moduleName) s = firstPart <> secondPart
   inputImpl
     | nDollars == 0 = ""
     | otherwise = String.joinWith ", "
-        $ map (\i -> "writeImpl i.\"$" <> writeJSON i <> "\"")
+        $ map (\i -> "unsafeCoerce i.\"$" <> writeJSON i <> "\"")
         $ (1 .. nDollars)
   oIsEmpty = isJust $ String.indexOf (String.Pattern "type O = {}") s
   hasDate = isJust $ String.indexOf (String.Pattern "Date") s
   hasMaybe = isJust $ String.indexOf (String.Pattern "Maybe") s
-  jsonImport = if oIsEmpty then "import Yoga.JSON (writeImpl)\n" else "import Yoga.JSON (read, writeImpl, E)\n"
+  unsafeCoerceImport = "import Unsafe.Coerce (unsafeCoerce)\n"
   dateImport = if hasDate then "import Data.Date (Date)\n" else ""
   maybeImport = if hasMaybe then "import Data.Maybe (Maybe)\n" else ""
-  firstPart = String.replace (String.Pattern (moduleName <> " where")) (String.Replacement (moduleName <> " where\n\nimport Prelude\nimport Effect.Aff (Aff)\nimport Data.Symbol (reflectSymbol)\nimport Type.Proxy (Proxy(..))\nimport Foreign (Foreign)\n" <> jsonImport <> dateImport <> maybeImport))
+  firstPart = String.replace (String.Pattern (moduleName <> " where")) (String.Replacement (moduleName <> " where\n\nimport Prelude\nimport Effect.Aff (Aff)\nimport Data.Symbol (reflectSymbol)\nimport Type.Proxy (Proxy(..))\nimport Foreign (Foreign)\n" <> unsafeCoerceImport <> dateImport <> maybeImport))
     $ String.replace (String.Pattern "<purescript>") (String.Replacement "")
     $ String.replace (String.Pattern "</purescript>") (String.Replacement "")
     $ String.replace (String.Pattern "\ntypescript\n") (String.Replacement "")
@@ -73,7 +73,7 @@ run go """
           <> inputVar
           <>
             """= do
-  void $ go (reflectSymbol (Proxy :: _ Q)) $ writeImpl ([ """
+  void $ go (reflectSymbol (Proxy :: _ Q)) $ unsafeCoerce ([ """
           <> inputImpl
           <>
             """ ] :: Array Foreign)
@@ -82,16 +82,16 @@ run go """
         """
 run :: (String -> Foreign -> Aff Foreign) ->""" <> input
           <>
-            """ Aff (E O)
+            """ Aff O
 run go """
           <> inputVar
           <>
             """= do
-  o <- go (reflectSymbol (Proxy :: _ Q)) $ writeImpl ([ """
+  o <- go (reflectSymbol (Proxy :: _ Q)) $ unsafeCoerce ([ """
           <> inputImpl
           <>
             """] :: Array Foreign)
-  pure $ read o
+  pure $ unsafeCoerce o
 """
 
 newtype QueryResult = QueryResult { result :: String, success :: Boolean }
