@@ -141,6 +141,13 @@ You can generate PureScript bindings for all your queries by running:
 OPENAI_API_KEY=<my-key> pnpm oooooooooorrrrrrrmm purescript -m migrations -q queries
 ```
 
+The bindings require the following PureScript packages to be installed:
+
+- `aff`
+- `foreign`
+- `maybe`
+- `yoga-json`
+
 ### TypeScript bindings
 
 You can generate TypeScript bindings for all your queries by running:
