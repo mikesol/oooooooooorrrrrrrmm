@@ -43,15 +43,21 @@ export const q: Q = `"""
     <>
       """`;
 export const o = ... // output type
+export const run = (f: (s: string, v: any) => Promise<any>) => (data: t.TypeOf<typeof i>) => f(q, [...]).then(x => o.decode(x));
 </typescript>
 
 As you can see, the query Q just needs to be quoted verbatim, as Typescript allows for typelevel strings. Ditto for `q`.
 
-For i, this should be a tuple with as many entries as there are input. For example, if the query has wildcards $1 and $2, where $1 is supposed to be a string and $2 is supposed to be a boolean, the input io-ts validator should be:
+For i, this should be a t.type with as many entries as there are input. For example, if the query has wildcards $1 and $2, where $1 is supposed to represent an email address of type string and $2 is supposed to represent a verified status of type boolean, the input io-ts validator should be:
 
 <typescript>
-export const i = t.tuple([t.string, t.boolean]);
+export const i = t.type({
+  email: t.string, // $1
+  verified: t.boolean // $2
+});
 </typescript>
+
+In the object, the order of the keys _must_ be the order of the positional arguemnts, and there should be a comment after each key indicating its argument.
 
 For o, this should be an array of objects, each of which represents an entry. For example, if the columns returned are an id string, a verified boolean, and an optional email string, the output io-ts validator should be:
 
@@ -59,6 +65,12 @@ For o, this should be an array of objects, each of which represents an entry. Fo
 export const o = t.array(
   t.type({ id: t.string, verified: t.boolean, email: t.union([t.null, t.string]) })
 );
+</typescript>
+
+For `run`, the content can be quoted verbatim _except_ for that [...] array, which should be filled in by the input arguments in correct order. In the example above, that'd be
+
+<typescript>
+[data.email, data.verified]
 </typescript>
 
 For each postgres type, here is the equivalent io-ts binding namespaced by t. I'm using a newer version of io-ts with t.date and t.json, so it's legit when needed.

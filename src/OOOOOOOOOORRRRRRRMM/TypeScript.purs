@@ -62,11 +62,6 @@ const json: z.ZodType<Json> = z.lazy(() =>
         else ""
       )
     <> String.replaceAll (String.Pattern "z.json()") (String.Replacement "json") s
-    <>
-      ( """
-export const run = (f: (s: string, v: any) => Promise<any>) => (input: z.infer<typeof i>) => f(q, input).then(x => o.parse(x));
-"""
-      )
     where
     zodIsImported = isJust (String.indexOf (String.Pattern "from 'zod'") s) || isJust (String.indexOf (String.Pattern "from \"zod\"") s)
     usesJson = isJust (String.indexOf (String.Pattern "z.json") s)
@@ -103,38 +98,8 @@ const json: t.Type<Json> = t.recursion('Json', () =>
 """
         else ""
       )
-    <>
-      ( """
-type TupleFn = <TCodecs extends readonly [...t.Mixed[]]>(
-  codecs: TCodecs,
-  name?: string,
-) => t.TupleType<
-  {
-    -readonly [K in keyof TCodecs]: TCodecs[K];
-  },
-  {
-    [K in keyof TCodecs]: TCodecs[K] extends t.Mixed
-      ? t.TypeOf<TCodecs[K]>
-      : unknown;
-  },
-  {
-    [K in keyof TCodecs]: TCodecs[K] extends t.Mixed
-      ? t.OutputOf<TCodecs[K]>
-      : unknown;
-  }
->;
-const tuple: TupleFn = t.tuple as any;
-"""
-      )
     <> String.replaceAll (String.Pattern "t.json") (String.Replacement "json")
-      ( String.replaceAll (String.Pattern "t.date") (String.Replacement "date")
-          (String.replaceAll (String.Pattern "t.tuple") (String.Replacement "tuple") s)
-      )
-    <>
-      ( """
-  export const run = (f: (s: string, v: any) => Promise<any>) => (input: t.TypeOf<typeof i>) => f(q, input).then(x => o.decode(x));
-"""
-      )
+      ( String.replaceAll (String.Pattern "t.date") (String.Replacement "date") s)
     where
     ioTsIsImported = isJust (String.indexOf (String.Pattern "from 'io-ts'") s) || isJust (String.indexOf (String.Pattern "from \"io-ts\"") s)
     usesJson = isJust (String.indexOf (String.Pattern "t.json") s)

@@ -37,11 +37,16 @@ type O = ... // output type
 
 As you can see, the query Q just needs to be quoted verbatim, as Typescript allows for typelevel strings. Ditto for `q`.
 
-For I, this should be a tuple with as many entries as there are input. For example, if the query has wildcards $1 and $2, where $1 is supposed to be a string and $2 is supposed to be a boolean, the input type should be:
+For I, this should be an object with as many entries as there are input and logically-named keys. For example, if the query has wildcards $1 and $2, where $1 is supposed to represent an email of type string and $2 is supposed to represent a verified status of type boolean, the input type could be:
 
 <typescript>
-export type I = [string, boolean];
+export type I = {
+  email: string; // $1
+  verified: boolean; // $2
+};
 </typescript>
+
+The entries in I _must_ be in the same order as the positional parameters in the query, and there should be a comment after each entry with the positional argument.
 
 For O, this should be an array of rows, each of which represents an entry. For example, if the columns returned are an id string, a verified boolean, and an optional email string, the output type should be:
 

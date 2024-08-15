@@ -39,15 +39,16 @@ type O = ... -- output type
 
 As you can see, the query Q just needs to be quoted verbatim, as PureScript allows for typelevel strings.
 
-For I, this should be a record with as many entries as there are input, with the same labels as in the query. For example, if the query has positional parameters $1 and $2, where $1 is supposed to be a string and $2 is supposed to be a boolean, the input type should be:
+For I, this should be a record with as many entries as there are positional parameters. The key of each entry should be human-readable and not duplicated, and the value should be the correct type. For example, if the query has positional parameters $1 and $2, where $1 is supposed to be a string for email and $2 is supposed to be a boolean for verified, the input type could be:
 
 <purescript>
-type I = { "$1" :: String, "$2" :: Boolean }
+type I =
+  { email :: String -- $1
+  , verified :: Boolean -- $2
+  }
 </purescript>
 
-Note that the input type's keys _must_ be quoted.
-
-The input's type must _always_ be a positional parameter.
+Each key/value pair of the input must _always_ be on its own line and _always_ be followed by a comment indicating the positional parameter, and the record must always be defined in the order of the parameters.
 
 If there is no input, the type of I _must_ be {}.
 

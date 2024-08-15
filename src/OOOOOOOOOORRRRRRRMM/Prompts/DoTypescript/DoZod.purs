@@ -33,20 +33,32 @@ export const i = ... // input type defined using zod
 export type Q = `"""<> query <>  """`;
 export const q: Q = `"""<> query <>  """`;
 export const o = ... // output type
+export const run = (f: (s: string, v: any) => Promise<any>) => (input: z.infer<typeof i>) => f(q, [...]).then(x => o.parse(x));
 </typescript>
 
 As you can see, the query Q just needs to be quoted verbatim, as Typescript allows for typelevel strings. Ditto for `q`.
 
-For i, this should be a tuple with as many entries as there are input. For example, if the query has wildcards $1 and $2, where $1 is supposed to be a string and $2 is supposed to be a boolean, the input zod validator should be:
+For i, this should be a z.object with as many entries as there are input. For example, if the query has wildcards $1 and $2, where $1 is supposed to represent an email address of type string and $2 is supposed to represent a verified status of type boolean, the input zod validator should be:
 
 <typescript>
-export const i = z.tuple([z.string(), z.boolean()]);
+export const i = z.object({
+  email: z.string(), // $1
+  verified: z.boolean() // $2
+});
 </typescript>
+
+In the object, the order of the keys _must_ be the order of the positional arguemnts, and there should be a comment after each key indicating its argument.
 
 For o, this should be an array of objects, each of which represents an entry. For example, if the columns returned are an id string, a verified boolean, and an optional email string, the output zod validator should be:
 
 <typescript>
 export const  o = z.array(z.object({ id: z.string(), verified: z.boolean(), email: z.string().nullable() }));
+</typescript>
+
+For `run`, the content can be quoted verbatim _except_ for that [...] array, which should be filled in by the input arguments in correct order. In the example above, that'd be
+
+<typescript>
+[input.email, input.verified]
 </typescript>
 
 For each postgres type, here is the equivalent zod binding namespaced by z. I'm using a newer version of zod with z.json(), so it's legit when needed.

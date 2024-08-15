@@ -9,7 +9,8 @@ import Data.CodePoint.Unicode (isAlphaNum, isUpper)
 import Data.Either (Either(..))
 import Data.Filterable (compact, filter, filterMap)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..), fromMaybe, isJust, maybe)
+import Data.List as List
+import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
 import Data.Newtype (over)
 import Data.String (codePointFromChar)
@@ -47,12 +48,19 @@ dehallucinate (DoPurescript.ModuleName moduleName) s = firstPart <> secondPart
   iIsEmpty = isJust $ String.indexOf (String.Pattern "type I = {}") s
   input = if iIsEmpty then "" else " I ->"
   inputVar = if iIsEmpty then "" else " i "
-  nDollars = Array.length (String.split (String.Pattern "$") (String.splitAt (fromMaybe 0 $ String.indexOf (String.Pattern "type Q") s) s).before) - 1
+  columnNamesInOrder = maybe [] Array.fromFoldable do
+    afterI <- String.split (String.Pattern "type I") s !! 1
+    iType <- String.split (String.Pattern "type Q") afterI !! 0
+    let
+      go a _ (List.Cons "::" b) = List.Cons a $ go "" List.Nil b
+      go _ l (List.Cons x b) = go x l b
+      go _ l List.Nil = l
+    pure $ go "" List.Nil $ filter (_ /= "") $ List.fromFoldable $ String.split (String.Pattern " ") iType
+
   inputImpl
-    | nDollars == 0 = ""
+    | Array.length columnNamesInOrder == 0 = ""
     | otherwise = String.joinWith ", "
-        $ map (\i -> "writeImpl i.\"$" <> writeJSON i <> "\"")
-        $ (1 .. nDollars)
+        $ map (\i -> "writeImpl i." <> i) columnNamesInOrder
   oIsEmpty = isJust $ String.indexOf (String.Pattern "type O = {}") s
   hasDate = isJust (String.indexOf (String.Pattern "JSDate") s) || isJust (String.indexOf (String.Pattern "Date") s)
   hasMaybe = isJust $ String.indexOf (String.Pattern "Maybe") s
@@ -255,7 +263,7 @@ pureScript info = do
             writeTextFile Encoding.UTF8 newModulePath $ dehallucinate (DoPurescript.ModuleName moduleName) result
             pure $ Loop $ Array.drop 1 queryArr
 
-  queriesToRun <- generateQueriesToRun ( Path.concat <<< (([ info.ps ] <> splitPrefix) <> _) <<< pure <<< (_ <> ".purs") <<<  pascalCase) _.purescript_binding info meta rawQ migrations queryPaths rawQPaths
+  queriesToRun <- generateQueriesToRun (Path.concat <<< (([ info.ps ] <> splitPrefix) <> _) <<< pure <<< (_ <> ".purs") <<< pascalCase) _.purescript_binding info meta rawQ migrations queryPaths rawQPaths
   tailRecM go $ compact queriesToRun
   closeClient client
   liftEffect $ close console
