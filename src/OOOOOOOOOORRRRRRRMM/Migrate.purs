@@ -43,6 +43,7 @@ import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), close
 import OOOOOOOOOORRRRRRRMM.Prompts.DoMigration as DoMigration
 import OOOOOOOOOORRRRRRRMM.Prompts.FixQuery (AdditionalContext(..))
 import OOOOOOOOOORRRRRRRMM.Prompts.FixQuery as FixQuery
+import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
 import OOOOOOOOOORRRRRRRMM.Schema (schema)
 import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
 
@@ -96,6 +97,7 @@ goQ
 goQ migrationIx info schema migrationResult { todo, done } = Array.head todo # maybe (pure $ Done $ Right done) \queryPath -> do
   log $ "Potentially revising query in " <> queryPath
   let rawQueryFile = Path.concat [ info.queries, "__raw", queryPath ]
+  let metaPath = Path.concat [ info.queries, "__meta", queryPath  ]
   queryText <- readTextFile Encoding.UTF8 rawQueryFile
   let intentionFile = Path.concat [ info.queries, queryPath ]
   intentionText <- readTextFile Encoding.UTF8 intentionFile
@@ -126,6 +128,30 @@ goQ migrationIx info schema migrationResult { todo, done } = Array.head todo # m
     pure $ Done $ Left unit
   else do
     log $ "The query " <> queryPath <> " was " <> if not revised then "not in need of revision." else "revised."
+    let
+      writeWithoutMerge = writeTextFile Encoding.UTF8 metaPath $ writeJSON
+        $ Metadata
+            { query_text_checksum: checksum queryText
+            , result_checksum: checksum result
+            , meta_version: 0
+            , purescript_binding: Nothing
+            , typescript_binding: Nothing
+            , most_recent_migration_checksum: checksum migrationResult
+            }
+    metaPathExists <- liftEffect $ exists metaPath
+    if metaPathExists then do
+      rawPreviousMeta <- readTextFile Encoding.UTF8 metaPath
+      case readJSON_ rawPreviousMeta of
+        Just (Metadata { typescript_binding, purescript_binding }) -> writeTextFile Encoding.UTF8 metaPath $ writeJSON $ Metadata
+          { query_text_checksum: checksum queryText
+          , result_checksum: checksum result
+          , meta_version: 0
+          , purescript_binding
+          , typescript_binding
+          , most_recent_migration_checksum: checksum migrationResult
+          }
+        Nothing -> writeWithoutMerge
+    else do writeWithoutMerge
     pure $ Loop $ { todo: Array.drop 1 todo, done: done <> [ queryPath /\ result ] }
 
 migrate :: Migrate -> Aff Unit
@@ -188,87 +214,98 @@ migrate info = do
           let systemM = DoMigration.system
           let userM = DoMigration.user (DoMigration.Sql schema) (DoMigration.Ask migrationText)
           let isRaw = String.take 6 migrationText == "--raw\n"
-          MigrationResult { result, success } <-
-            if isRaw then pure $ MigrationResult { result: migrationText, success: true }
-            else do
-              ChatCompletionResponse { choices } <- createCompletions
-                $ over ChatCompletionRequest
-                    _
-                      { messages =
-                          [ message system systemM
-                          , message user userM
-                          ]
-                      , response_format = pure $ ResponseFormat DoMigration.responseFormat
-                      }
-                    ccr
-              maybe (throwError $ error "No migration could be generated") pure do
-                { message: { content } } <- choices !! 0
-                content >>= readJSON_
-          if not success then do
-            log result
-            pure $ Done unit
-          else do
-            let
-              qtext =
-                """Please review the migration text inside the <migration> tag below.
-
+          let
+            cc retries = do
+              MigrationResult { result, success } <-
+                if isRaw then pure $ MigrationResult { result: migrationText, success: true }
+                else do
+                  ChatCompletionResponse { choices } <- createCompletions
+                    $ over ChatCompletionRequest
+                        _
+                          { messages =
+                              [ message system systemM
+                              , message user userM
+                              ]
+                          , response_format = pure $ ResponseFormat DoMigration.responseFormat
+                          }
+                        ccr
+                  maybe (throwError $ error "No migration could be generated") pure do
+                    { message: { content } } <- choices !! 0
+                    content >>= readJSON_
+              if not success then do
+                log result
+                pure $ Done unit
+              else do
+                let
+                  qtext =
+                    """Please review the migration text inside the <migration> tag below.
 <migration>
-"""
-                  <> result
-                  <>
-                    """
+              """
+                      <> result
+                      <>
+                        """
 </migration>
 Press n or N to reject and any other key to continue: """
 
-            response <- if info.yes then pure "y" else question qtext console
-            case response of
-              x
-                | x == "n" || x == "N" -> do
-                    log "Oh noes! Please change your prompt and try again."
-                    pure $ Done unit
-                | otherwise -> do
-                    log "Great! Creating migration 📄"
-                    cmd <- try $ runSqlCommand client result mempty
-                    case cmd of
-                      Left _ -> do
-                        log $ "It looks like the migration could not be run against the DB."
-                        log $ "Please change your prompt and try again."
+                response <- if info.yes then pure "y" else question qtext console
+                case response of
+                  x
+                    | x == "n" || x == "N" -> do
+                        log "Oh noes! Please change your prompt and try again."
                         pure $ Done unit
-                      Right _ -> do
-                        let
-                          cont = do
-                            -- now it's safe to write the migration and the new queries
-                            let newMigrationPath = Path.concat [ raw, show migrationIx ]
-                            let metaPath = Path.concat [ meta, show migrationIx ]
-                            writeTextFile Encoding.UTF8 newMigrationPath result
-                            writeTextFile Encoding.UTF8 metaPath $ writeJSON
-                              { migration_text_checksum: checksum migrationText
-                              , result_checksum: checksum result
-                              , meta_version: 0
-                              }
-                            pure $ Loop $ Array.drop 1 migrationArr
-                        -- revise queries
-                        queriesExists <- liftEffect $ exists info.queries
-                        if (not queriesExists) then cont
-                        else do
-                          allQueryPrompts <- filter (eq <*> kebabCase) <$> readdir info.queries
-                          allQueries <- filter (flip Array.elem allQueryPrompts) <$> readdir (Path.concat [ info.queries, "__raw" ])
-                          newQueries' <- tailRecM
-                            (goQ migrationIx info schema result)
-                            { todo: allQueries, done: [] }
-                          case newQueries' of
-                            Left _ -> pure $ Done unit
-                            Right newQueries -> do
-                              for_ newQueries \(queryPath /\ queryText) ->
-                                writeTextFile
-                                  Encoding.UTF8
-                                  (Path.concat [ info.queries, "__raw", queryPath ])
-                                  queryText
-                              cont
+                    | otherwise -> do
+                        log $ if info.yes then "Creating migration 📄\n<migration>\n" <> result <> "\n</migration>\n" else "Great! Creating migration 📄"
+                        cmd <- try $ runSqlCommand client result mempty
+                        case cmd of
+                          Left _ -> do
+                            log $ "It looks like the migration could not be run against the DB."
+                            if retries > 1 then do
+                              log $ "Rerunning with " <> writeJSON (retries - 1) <> " to go."
+                              cc $ retries - 1
+                            else do
+                              log $ "Please change your prompt and try again."
+                              pure $ Done unit
+                          Right _ -> do
+                            let
+                              cont = do
+                                -- now it's safe to write the migration and the new queries
+                                let newMigrationPath = Path.concat [ raw, show migrationIx ]
+                                let metaPath = Path.concat [ meta, show migrationIx ]
+                                writeTextFile Encoding.UTF8 newMigrationPath result
+                                writeTextFile Encoding.UTF8 metaPath $ writeJSON
+                                  { migration_text_checksum: checksum migrationText
+                                  , result_checksum: checksum result
+                                  , meta_version: 0
+                                  }
+                                pure $ Loop $ Array.drop 1 migrationArr
+                            -- revise queries
+                            queriesExists <- liftEffect $ exists info.queries
+                            if (not queriesExists) then cont
+                            else do
+                              let rawQDir = Path.concat [ info.queries, "__raw" ]
+                              rawQExists <- liftEffect (exists rawQDir)
+                              if not rawQExists then cont
+                              else do
+                                allQueryPrompts <- filter (eq <*> kebabCase) <$> readdir info.queries
+                                allQueries <- filter (flip Array.elem allQueryPrompts) <$> readdir rawQDir
+                                newQueries' <- tailRecM
+                                  (goQ migrationIx info schema result)
+                                  { todo: allQueries, done: [] }
+                                case newQueries' of
+                                  Left _ -> pure $ Done unit
+                                  Right newQueries -> do
+                                    for_ newQueries \(queryPath /\ queryText) ->
+                                      writeTextFile
+                                        Encoding.UTF8
+                                        (Path.concat [ info.queries, "__raw", queryPath ])
+                                        queryText
+                                    cont
+          cc info.tries
   tailRecM go (Array.drop (Array.length rawMigrations) migrations)
   closeClient client
   liftEffect $ close console
   -- at the end of a migration, we always write the human-readable schema
+  log $ "Migrations applied 💪\nCreating a schema in " <> info.schema
   schema
     { humanReadable: true
     , migrations: info.migrations

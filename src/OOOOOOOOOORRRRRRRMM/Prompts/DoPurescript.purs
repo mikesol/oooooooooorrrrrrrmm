@@ -39,13 +39,15 @@ type O = ... -- output type
 
 As you can see, the query Q just needs to be quoted verbatim, as PureScript allows for typelevel strings.
 
-For I, this should be a record with as many entries as there are input, with the same labels as in the query. For example, if the query has wildcards $1 and $2, where $1 is supposed to be a string and $2 is supposed to be a boolean, the input type should be:
+For I, this should be a record with as many entries as there are input, with the same labels as in the query. For example, if the query has positional parameters $1 and $2, where $1 is supposed to be a string and $2 is supposed to be a boolean, the input type should be:
 
 <purescript>
 type I = { "$1" :: String, "$2" :: Boolean }
 </purescript>
 
 Note that the input type's keys _must_ be quoted.
+
+The input's type must _always_ be a positional parameter.
 
 If there is no input, the type of I _must_ be {}.
 
@@ -67,9 +69,9 @@ For each postgres type, here is the equivalent PureScript type:
 - float8 -> Number
 - jsonb -> Foreign
 - json -> Foreign
-- timestamptz -> Date
-- date -> Date
-- timestamp -> Date
+- timestamptz -> JSDate
+- date -> JSDate
+- timestamp -> JSDate
 
 Arrays should be arrays of these things. Stuff that can be `null` types should be Maybe in I and O.
 

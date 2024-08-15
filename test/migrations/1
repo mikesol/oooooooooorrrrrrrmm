@@ -1,5 +1,0 @@
-Modify the user table to contain a verified boolean,
-and set everyone so far to false. The default should also be false.
-
-Also create a friends table that has an autoincrementing id and two columns, asker and receiver. Both should be non null with a foreign key
-constraint on the user id.

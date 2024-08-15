@@ -6,6 +6,7 @@ package:
     - console
     - effect
     - filterable
+    - js-date
     - maybe
     - node-child-process
     - node-fs
@@ -17,7 +18,8 @@ package:
     - yoga-json
   test:
     main: Test.Main
-    dependencies: []
+    dependencies:
+      - spec
 workspace:
   packageSet:
     registry: 56.4.0

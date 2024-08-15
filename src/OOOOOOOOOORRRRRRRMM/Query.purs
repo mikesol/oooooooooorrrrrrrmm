@@ -160,7 +160,7 @@ Press n or N to reject and any other key to continue: """
                     log "Oh noes! Please change your prompt and try again."
                     pure $ Done unit
                 | otherwise -> do
-                    log "Great! Creating query"
+                    log $ if info.yes then "Creating query 🤔\n<query>\n"<>result<>"\n</query>\n" else "Great! Creating query 🤔"
                     -- now it's safe to write the query
                     let newQueryPath = Path.concat [ rawQ, q ]
                     let metaPath = Path.concat [ meta, q ]
@@ -192,7 +192,7 @@ Press n or N to reject and any other key to continue: """
                         Nothing -> writeWithoutMerge
                     else do writeWithoutMerge
                     pure $ Loop $ Array.drop 1 queryArr
-  mostRecentMigration <- readTextFile Encoding.UTF8 $ Path.concat [ info.migrations, writeJSON (Array.length migrationPaths - 1) ]
+  mostRecentMigration <- readTextFile Encoding.UTF8 $ Path.concat [ info.migrations, "__raw", writeJSON (Array.length migrations - 1) ]
   let mostRecentMigrationChecksum = checksum mostRecentMigration
   queriesToRun <- for queryPaths \qp -> do
     let runMe = pure $ Just qp

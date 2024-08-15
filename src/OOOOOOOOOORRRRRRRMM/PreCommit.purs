@@ -2,11 +2,10 @@ module OOOOOOOOOORRRRRRRMM.PreCommit where
 
 import Prelude
 
-import Data.Array ((..))
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Filterable (filter)
 import Data.Foldable (for_)
-import Data.Maybe (Maybe(..))
 import Effect.Aff (Aff, error, throwError)
 import Effect.Class (liftEffect)
 import Node.Encoding as Encoding
@@ -16,7 +15,10 @@ import Node.Path as Path
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (PreCommit)
 import OOOOOOOOOORRRRRRRMM.Checksum (checksum)
 import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
-import Yoga.JSON (readJSON, readJSON_, writeJSON)
+import Yoga.JSON (readJSON, writeJSON)
+
+noRawNoMetaAndSorted :: Array String -> Array String
+noRawNoMetaAndSorted = Array.sort <<< filter (_ /= "__raw") <<< filter (_ /= "__meta")
 
 preCommit :: PreCommit -> Aff Unit
 preCommit info = do
@@ -30,13 +32,13 @@ preCommit info = do
   queriesExist <- liftEffect $ exists info.queries
   when (not queriesExist) do
     throwError $ error "The pre-commit hook requires a queries directory to exist. Even if it is empty, please create one and check it into version control."
-  migrationFiles <- readdir migrationPath
-  migrationMetaFiles <- readdir migrationMetaPath
-  migrationRawFiles <- readdir migrationRawPath
-  queryFiles <- readdir queryPath
-  queryMetaFiles <- readdir queryMetaPath
-  queryRawFiles <- readdir queryRawPath
-  when ((Array.sort (map readJSON_ migrationFiles) /= map Just (0 .. (Array.length migrationFiles - 1))) || (migrationFiles /= migrationMetaFiles) || (migrationFiles /= migrationRawFiles)) do
+  migrationFiles <- noRawNoMetaAndSorted <$> readdir migrationPath
+  migrationMetaFiles <- noRawNoMetaAndSorted <$> readdir migrationMetaPath
+  migrationRawFiles <- noRawNoMetaAndSorted <$> readdir migrationRawPath
+  queryFiles <- noRawNoMetaAndSorted <$>readdir queryPath
+  queryMetaFiles <-noRawNoMetaAndSorted <$> readdir queryMetaPath
+  queryRawFiles <- noRawNoMetaAndSorted <$>readdir queryRawPath
+  when ((migrationFiles /= migrationMetaFiles) || (migrationFiles /= migrationRawFiles)) do
     throwError $ error $
       """Migration files are inconsistent:
 User-created migration files: """ <> writeJSON migrationFiles
@@ -77,7 +79,8 @@ Metadata: """
 Please don't check this into vc. The best way to fix this is to revert whatever work you've just done.
 If that's not possible or that won't fix the problem, the best way to fix this is to delete the `__raw` and `__meta` folders from your query and run `oooooooooorrrrrrrmm q` to regenerate the queries. Also make sure to regenerate your language bindings if you have any.
 """
-  mostRecentMigration <- readTextFile Encoding.UTF8 $ Path.concat [ info.migrations, writeJSON (nMigrations - 1) ]
+  let mrmPath = Path.concat [ info.migrations, "__raw", writeJSON (nMigrations - 1) ]
+  mostRecentMigration <- readTextFile Encoding.UTF8 mrmPath
   for_ queryMetaFiles \queryMetaFile -> do
     queryMeta <- readTextFile Encoding.UTF8 $ Path.concat [ queryMetaPath, queryMetaFile ]
     case readJSON queryMeta of

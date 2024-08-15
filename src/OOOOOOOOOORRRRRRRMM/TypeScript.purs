@@ -20,7 +20,7 @@ import Node.Buffer (toString)
 import Node.ChildProcess (exec')
 import Node.Encoding (Encoding(..))
 import Node.Encoding as Encoding
-import Node.FS.Aff (mkdir, readTextFile, readdir, unlink, writeTextFile)
+import Node.FS.Aff (mkdir, readTextFile, readdir, writeTextFile)
 import Node.FS.Sync (exists)
 import Node.Path (FilePath)
 import Node.Path as Path
@@ -42,11 +42,10 @@ derive newtype instance ReadForeign QueryResult
 
 dehallucinate :: Maybe Validator -> String -> String
 dehallucinate mv ss = go mv
-  $ String.replace (String.Pattern "```typescript") (String.Replacement "")
-  $ String.replace (String.Pattern "<typescript>") (String.Replacement "")
-  $ String.replace (String.Pattern "</typescript>") (String.Replacement "")
-  $ String.replace (String.Pattern "\ntypescript\n") (String.Replacement "")
-  $ String.replace (String.Pattern "```") (String.Replacement "") ss
+  $ String.replaceAll (String.Pattern "```") (String.Replacement "")
+  $ String.replaceAll (String.Pattern "<typescript>") (String.Replacement "")
+  $ String.replaceAll (String.Pattern "</typescript>") (String.Replacement "")
+  $ String.replaceAll (String.Pattern "```typescript") (String.Replacement "") ss
   where
   go (Just Zod) s = (if zodIsImported then "" else "import { z } from 'zod';")
     <>
@@ -62,7 +61,7 @@ const json: z.ZodType<Json> = z.lazy(() =>
 """
         else ""
       )
-    <> String.replace (String.Pattern "z.json()") (String.Replacement "json") s
+    <> String.replaceAll (String.Pattern "z.json()") (String.Replacement "json") s
     <>
       ( """
 export const run = (f: (s: string, v: any) => Promise<any>) => (input: z.infer<typeof i>) => f(q, input).then(x => o.parse(x));
@@ -92,7 +91,13 @@ const date = isInstanceOf(Date);
     <>
       ( if usesJson then
           """
-const json = t.recursion('Json', () =>
+type JsonPrimative = string | number | boolean | null;
+type JsonArray = Json[];
+type JsonObject = { [key: string]: Json };
+type JsonComposite = JsonArray | JsonObject;
+type Json = JsonPrimative | JsonComposite;
+
+const json: t.Type<Json> = t.recursion('Json', () =>
   t.union([t.null, t.boolean, t.string, t.number, t.array(json), t.record(t.string, json)])
 )
 """
@@ -121,9 +126,9 @@ type TupleFn = <TCodecs extends readonly [...t.Mixed[]]>(
 const tuple: TupleFn = t.tuple as any;
 """
       )
-    <> String.replace (String.Pattern "t.json") (String.Replacement "json")
-      ( String.replace (String.Pattern "t.date") (String.Replacement "date")
-          (String.replace (String.Pattern "t.tuple") (String.Replacement "tuple") s)
+    <> String.replaceAll (String.Pattern "t.json") (String.Replacement "json")
+      ( String.replaceAll (String.Pattern "t.date") (String.Replacement "date")
+          (String.replaceAll (String.Pattern "t.tuple") (String.Replacement "tuple") s)
       )
     <>
       ( """
@@ -163,11 +168,8 @@ migrationsStartAt0AndIncreaseBy1 = go 0
 typescript :: Typescript -> Aff Unit
 typescript info = do
   pthExists <- liftEffect $ exists info.ts
-  if (not pthExists) then do
+  when (not pthExists)  do
     void $ mkdir info.ts
-  else do
-    dc <- readdir info.ts
-    for_ dc \f -> unlink $ Path.concat [ info.ts, f ]
   console <- liftEffect $ createConsoleInterface noCompletion
   migrationPaths <- readdir info.migrations
   let migrations = filterMap readJSON_ migrationPaths
@@ -277,7 +279,7 @@ typescript info = do
             writeTextFile Encoding.UTF8 newModulePath $ dehallucinate info.validator result
             pure $ Loop $ Array.drop 1 queryArr
 
-  queriesToRun <- generateQueriesToRun _.typescript_binding info meta rawQ migrationPaths queryPaths rawQPaths
+  queriesToRun <- generateQueriesToRun ( Path.concat <<< ([ info.ts ] <> _) <<< pure <<< (_ <> ".ts") <<< pascalCase) _.typescript_binding info meta rawQ migrations queryPaths rawQPaths
   tailRecM go $ compact queriesToRun
   closeClient client
   liftEffect $ close console

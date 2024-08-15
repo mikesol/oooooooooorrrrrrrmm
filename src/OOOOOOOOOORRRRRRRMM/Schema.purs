@@ -17,7 +17,8 @@ import Node.Buffer (toString)
 import Node.ChildProcess (exec')
 import Node.Encoding (Encoding(..))
 import Node.Encoding as Encoding
-import Node.FS.Aff (readTextFile, readdir, writeTextFile)
+import Node.FS.Aff (mkdir', readTextFile, readdir, writeTextFile)
+import Node.FS.Perms (permsAll)
 import Node.FS.Sync (exists)
 import Node.Path (FilePath)
 import Node.Path as Path
@@ -58,6 +59,9 @@ migrationsStartAt0AndIncreaseBy1 = go 0
 
 schema :: Schema -> Aff Unit
 schema info = do
+  spExists <- liftEffect $ exists $ Path.dirname info.path
+  when (not spExists) do
+    mkdir' (Path.dirname info.path) { mode: permsAll, recursive: true } 
   console <- liftEffect $ createConsoleInterface noCompletion
   migrationPaths <- readdir info.migrations
   let migrations = filterMap readJSON_ migrationPaths

@@ -24,7 +24,8 @@ import Node.Buffer (toString)
 import Node.ChildProcess (exec')
 import Node.Encoding (Encoding(..))
 import Node.Encoding as Encoding
-import Node.FS.Aff (mkdir, readTextFile, readdir, unlink, writeTextFile)
+import Node.FS.Aff (mkdir, mkdir', readTextFile, readdir, writeTextFile)
+import Node.FS.Perms (permsAll)
 import Node.FS.Sync (exists)
 import Node.Path (FilePath)
 import Node.Path as Path
@@ -50,22 +51,25 @@ dehallucinate (DoPurescript.ModuleName moduleName) s = firstPart <> secondPart
   inputImpl
     | nDollars == 0 = ""
     | otherwise = String.joinWith ", "
-        $ map (\i -> "unsafeCoerce i.\"$" <> writeJSON i <> "\"")
+        $ map (\i -> "writeImpl i.\"$" <> writeJSON i <> "\"")
         $ (1 .. nDollars)
   oIsEmpty = isJust $ String.indexOf (String.Pattern "type O = {}") s
-  hasDate = isJust $ String.indexOf (String.Pattern "Date") s
+  hasDate = isJust (String.indexOf (String.Pattern "JSDate") s) || isJust (String.indexOf (String.Pattern "Date") s)
   hasMaybe = isJust $ String.indexOf (String.Pattern "Maybe") s
-  unsafeCoerceImport = "import Unsafe.Coerce (unsafeCoerce)\n"
-  dateImport = if hasDate then "import Data.Date (Date)\n" else ""
+  jsonImport = if oIsEmpty then "import Yoga.JSON (writeImpl)\n" else "import Yoga.JSON (writeImpl, E, read)\n"
+  dateImport = if hasDate then "import Data.JSDate (JSDate)\n" else ""
   maybeImport = if hasMaybe then "import Data.Maybe (Maybe)\n" else ""
-  firstPart = String.replace (String.Pattern (moduleName <> " where")) (String.Replacement (moduleName <> " where\n\nimport Prelude\nimport Effect.Aff (Aff)\nimport Data.Symbol (reflectSymbol)\nimport Type.Proxy (Proxy(..))\nimport Foreign (Foreign)\n" <> unsafeCoerceImport <> dateImport <> maybeImport))
-    $ String.replace (String.Pattern "<purescript>") (String.Replacement "")
-    $ String.replace (String.Pattern "</purescript>") (String.Replacement "")
-    $ String.replace (String.Pattern "\ntypescript\n") (String.Replacement "")
-    $ String.replace (String.Pattern "```") (String.Replacement "")
-    $ String.replace (String.Pattern "```purescript") (String.Replacement "")
-    $ String.replace (String.Pattern "type I = {}") (String.Replacement "")
-    $ String.replace (String.Pattern "type O = {}") (String.Replacement "") s
+
+  firstPart = String.replaceAll (String.Pattern (moduleName <> " where")) (String.Replacement (moduleName <> " where\n\nimport Prelude\nimport Effect.Aff (Aff)\nimport Data.Symbol (reflectSymbol)\nimport Type.Proxy (Proxy(..))\nimport Foreign (Foreign)\n" <> jsonImport <> dateImport <> maybeImport))
+    $ String.replaceAll (String.Pattern "<purescript>") (String.Replacement "")
+    -- corrective for Date if it messes that up
+    $ String.replaceAll (String.Pattern "JSJSDate") (String.Replacement "JSDate")
+    $ String.replaceAll (String.Pattern "Date") (String.Replacement "JSDate")
+    $ String.replaceAll (String.Pattern "</purescript>") (String.Replacement "")
+    $ String.replaceAll (String.Pattern "```") (String.Replacement "")
+    $ String.replaceAll (String.Pattern "```purescript") (String.Replacement "")
+    $ String.replaceAll (String.Pattern "type I = {}") (String.Replacement "")
+    $ String.replaceAll (String.Pattern "type O = {}") (String.Replacement "") s
   secondPart
     | oIsEmpty =
         """
@@ -76,7 +80,7 @@ run go """
           <> inputVar
           <>
             """= do
-  void $ go (reflectSymbol (Proxy :: _ Q)) $ unsafeCoerce ([ """
+  void $ go (reflectSymbol (Proxy :: _ Q)) $ writeImpl ([ """
           <> inputImpl
           <>
             """ ] :: Array Foreign)
@@ -85,16 +89,16 @@ run go """
         """
 run :: (String -> Foreign -> Aff Foreign) ->""" <> input
           <>
-            """ Aff O
+            """ Aff (E O)
 run go """
           <> inputVar
           <>
             """= do
-  o <- go (reflectSymbol (Proxy :: _ Q)) $ unsafeCoerce ([ """
+  o <- go (reflectSymbol (Proxy :: _ Q)) $ writeImpl ([ """
           <> inputImpl
           <>
             """] :: Array Foreign)
-  pure $ unsafeCoerce o
+  pure $ read o
 """
 
 newtype QueryResult = QueryResult { result :: String, success :: Boolean }
@@ -140,12 +144,10 @@ pureScript info = do
           splitPrefix
   when (not $ coerce prefixIsValid) do
     throwError $ error "The prefix must be a valid purescript module name."
-  pthExists <- liftEffect $ exists info.ps
-  if (not pthExists) then do
-    void $ mkdir info.ps
-  else do
-    dc <- readdir $ Path.concat $ [ info.ps ] <> splitPrefix
-    for_ dc \f -> unlink $ Path.concat $ [ info.ps ] <> splitPrefix <> [ f ]
+  let longPath = Path.concat $ [ info.ps ] <> splitPrefix
+  pthExists <- liftEffect $ exists longPath
+  when (not pthExists) do
+    void $ mkdir' longPath { mode: permsAll, recursive: true }
   for_ (1 .. Array.length splitPrefix) \ix -> do
     let xpth = Path.concat $ [ info.ps ] <> Array.take ix splitPrefix
     xpthExists <- liftEffect $ exists xpth
@@ -253,7 +255,7 @@ pureScript info = do
             writeTextFile Encoding.UTF8 newModulePath $ dehallucinate (DoPurescript.ModuleName moduleName) result
             pure $ Loop $ Array.drop 1 queryArr
 
-  queriesToRun <- generateQueriesToRun _.purescript_binding info meta rawQ migrationPaths queryPaths rawQPaths
+  queriesToRun <- generateQueriesToRun ( Path.concat <<< (([ info.ps ] <> splitPrefix) <> _) <<< pure <<< (_ <> ".purs") <<<  pascalCase) _.purescript_binding info meta rawQ migrations queryPaths rawQPaths
   tailRecM go $ compact queriesToRun
   closeClient client
   liftEffect $ close console

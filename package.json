@@ -9,7 +9,7 @@
   "scripts": {
     "start": "pnpm spago run",
     "build": "spago build && spago bundle --bundle-type app --platform node --outfile index.mjs",
-    "test": "spago test"
+    "test": "pnpm build && spago test"
   },
   "keywords": [],
   "author": "",

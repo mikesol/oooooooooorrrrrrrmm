@@ -1,3 +1,0 @@
-ALTER TABLE users
-    ADD COLUMN date_joined TIMESTAMP NOT NULL DEFAULT NOW(),
-    ADD COLUMN settings JSON;

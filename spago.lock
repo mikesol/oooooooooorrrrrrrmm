@@ -8,6 +8,7 @@ workspace:
         - console
         - effect
         - filterable
+        - js-date
         - maybe
         - node-child-process
         - node-fs
@@ -17,12 +18,15 @@ workspace:
         - random
         - strings-extra
         - yoga-json
-      test_dependencies: []
+      test_dependencies:
+        - spec
       build_plan:
         - aff
+        - ansi
         - argparse-basic
         - arraybuffer-types
         - arrays
+        - avar
         - bifunctors
         - catenable-lists
         - console
@@ -40,6 +44,7 @@ workspace:
         - foldable-traversable
         - foreign
         - foreign-object
+        - fork
         - free
         - functions
         - functors
@@ -52,6 +57,7 @@ workspace:
         - lazy
         - lists
         - maybe
+        - mmorph
         - newtype
         - node-buffer
         - node-child-process
@@ -71,6 +77,7 @@ workspace:
         - orders
         - parallel
         - partial
+        - pipes
         - posix-types
         - prelude
         - profunctor
@@ -78,6 +85,7 @@ workspace:
         - record
         - refs
         - safe-coerce
+        - spec
         - st
         - strings
         - strings-extra
@@ -620,6 +628,14 @@ packages:
       - tailrec
       - transformers
       - unsafe-coerce
+  ansi:
+    type: registry
+    version: 7.0.0
+    integrity: sha256-ZMB6HD+q9CXvn9fRCmJ8dvuDrOVHcjombL3oNOerVnE=
+    dependencies:
+      - foldable-traversable
+      - lists
+      - strings
   argparse-basic:
     type: registry
     version: 2.0.0
@@ -664,6 +680,17 @@ packages:
       - tuples
       - unfoldable
       - unsafe-coerce
+  avar:
+    type: registry
+    version: 5.0.0
+    integrity: sha256-e7hf0x4hEpcygXP0LtvfvAQ49Bbj2aWtZT3gqM///0A=
+    dependencies:
+      - aff
+      - effect
+      - either
+      - exceptions
+      - functions
+      - maybe
   bifunctors:
     type: registry
     version: 6.0.0
@@ -852,6 +879,12 @@ packages:
       - tuples
       - typelevel-prelude
       - unfoldable
+  fork:
+    type: registry
+    version: 6.0.0
+    integrity: sha256-X7u0SuCvFbLbzuNEKLBNuWjmcroqMqit4xEzpQwAP7E=
+    dependencies:
+      - aff
   free:
     type: registry
     version: 7.1.0
@@ -988,6 +1021,14 @@ packages:
       - invariant
       - newtype
       - prelude
+  mmorph:
+    type: registry
+    version: 7.0.0
+    integrity: sha256-urZlZNNqGeQFe5D/ClHlR8QgGBNHTMFPtJ5S5IpflTQ=
+    dependencies:
+      - free
+      - functors
+      - transformers
   newtype:
     type: registry
     version: 5.0.0
@@ -1212,6 +1253,18 @@ packages:
     version: 4.0.0
     integrity: sha256-fwXerld6Xw1VkReh8yeQsdtLVrjfGiVuC5bA1Wyo/J4=
     dependencies: []
+  pipes:
+    type: registry
+    version: 8.0.0
+    integrity: sha256-kvfqGM4cPA/wCcBHbp5psouFw5dZGvku2462x7ZBwSY=
+    dependencies:
+      - aff
+      - lists
+      - mmorph
+      - prelude
+      - tailrec
+      - transformers
+      - tuples
   posix-types:
     type: registry
     version: 6.0.0
@@ -1265,6 +1318,38 @@ packages:
     integrity: sha256-a1ibQkiUcbODbLE/WAq7Ttbbh9ex+x33VCQ7GngKudU=
     dependencies:
       - unsafe-coerce
+  spec:
+    type: registry
+    version: 7.6.1
+    integrity: sha256-VycY2SgN8rHZGqcMqZEiTh9OdCw40CUMX2pCoSUJ/zY=
+    dependencies:
+      - aff
+      - ansi
+      - arrays
+      - avar
+      - bifunctors
+      - control
+      - datetime
+      - effect
+      - either
+      - exceptions
+      - foldable-traversable
+      - fork
+      - identity
+      - integers
+      - lists
+      - maybe
+      - newtype
+      - now
+      - ordered-collections
+      - parallel
+      - pipes
+      - prelude
+      - refs
+      - strings
+      - tailrec
+      - transformers
+      - tuples
   st:
     type: registry
     version: 6.2.0

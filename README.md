@@ -150,6 +150,7 @@ The bindings require the following PureScript packages to be installed:
 - `aff`
 - `foreign`
 - `maybe`
+- `yoga-json`
 
 ### TypeScript bindings
 

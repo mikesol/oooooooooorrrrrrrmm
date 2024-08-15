@@ -20,6 +20,7 @@ type Migrate =
   , context :: String
   , schema :: String
   , yes :: Boolean
+  , tries :: Int
   }
 
 type PreCommit =
@@ -95,6 +96,10 @@ migrate = command [ "migrate", "m" ] "Create migrations." do
         flag
           [ "--yes", "-y" ]
           "Bypasses review and just writes the migration." # boolean
+    , tries:
+        argument
+          [ "--tries", "-t" ]
+          "How many times to try the migration on failure." # int # default 3
     }
 
 preCommit ∷ ArgParser PreCommit
