@@ -77,7 +77,7 @@ You can apply these migrations sequentially to your db by running:
 pnpm oooooooooorrrrrrrmm bootstrap -c 'postgresql://my.connection.string'
 ```
 
-### Bootstrap a db
+### Bootstrap a temporary db
 
 You can apply these migrations sequentially to a temporary db by running:
 
@@ -86,6 +86,17 @@ pnpm oooooooooorrrrrrrmm bootstrap-tmp
 ```
 
 A URL of the temporary DB will be printed to the command line. If you want to set up your temporary DB a particular way, you can pass an `--args` command followed by args to [`pg_tmp`](https://eradman.com/ephemeralpg/).
+
+### Reverting migrations
+
+If you haven't committed a migration to the db and/or to vc, the easiest way to revert it is to:
+
+- the migration in your migrations directory
+- a file with the same name in the `__raw` directory of your migrations directory
+- a file with the same name in the `__meta` directory of your migrations directory
+- recreate your [queries](#create-a-query) and [bindings](#purescript-bindings)
+
+Sometimes, you'll get into a funky state where the db and your migrations fall out of sync. When this happens, the easiest thing to do is to run `pg_dump` on your db to generate a schema, delete your migrations, and add a `0` migration that starts with a single-line comment `--raw` followed by the schema. Then, regenerate your queries and bindings. Most stuff shouldn't budge.
 
 ### Create a query
 
