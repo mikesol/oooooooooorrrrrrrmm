@@ -61,4 +61,4 @@ jobs:
         run: pnpm spago build --pedantic-packages
 
       - name: Test
-        run: pnpm spago t
+        run: pnpm t
