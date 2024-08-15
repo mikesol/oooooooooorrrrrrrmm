@@ -153,7 +153,7 @@ query info = do
 </query>
 Press n or N to reject and any other key to continue: """
 
-            response <- question qtext console
+            response <- if info.yes then pure "y" else question qtext console
             case response of
               x
                 | x == "n" || x == "N" -> do

@@ -19,15 +19,18 @@ type Migrate =
   , queries :: String
   , context :: String
   , schema :: String
+  , yes :: Boolean
   }
 
-type PreCommit = 
+type PreCommit =
   { migrations :: String
   , queries :: String
   }
+
 type Query =
   { queries :: String
   , migrations :: String
+  , yes :: Boolean
   }
 
 type PureScript =
@@ -78,7 +81,7 @@ migrate = command [ "migrate", "m" ] "Create migrations." do
           [ "--queries", "-q" ]
           "The directory with the queries. All queries must be kebab case. Anything that's not kebab case won't be considered a query and will be ignored."
           # default "queries"
-          , schema:
+    , schema:
         argument
           [ "--schema", "-s" ]
           "The directory where the new schema will be written."
@@ -88,6 +91,10 @@ migrate = command [ "migrate", "m" ] "Create migrations." do
           [ "--context", "-c" ]
           "Context needed for the migrations. In the form <query>/<index>, where <query> is the name of the query and <index> is the index of the migration that needs context."
           # default "context"
+    , yes:
+        flag
+          [ "--yes", "-y" ]
+          "Bypasses review and just writes the migration." # boolean
     }
 
 preCommit ∷ ArgParser PreCommit
@@ -118,6 +125,10 @@ query = command [ "query", "q" ] "Create queries." do
           [ "--migrations", "-m" ]
           "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
           # default "migrations"
+    , yes:
+        flag
+          [ "--yes", "-y" ]
+          "Bypasses review and just writes the query." # boolean
     }
 
 pureScript ∷ ArgParser PureScript
