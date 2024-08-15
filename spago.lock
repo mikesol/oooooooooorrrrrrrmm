@@ -13,6 +13,7 @@ workspace:
         - filterable
         - foldable-traversable
         - foreign
+        - lists
         - maybe
         - newtype
         - node-buffer
