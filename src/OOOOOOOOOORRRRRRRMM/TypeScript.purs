@@ -26,11 +26,14 @@ import Node.Path (FilePath)
 import Node.Path as Path
 import Node.ReadLine (close, createConsoleInterface, noCompletion)
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Typescript, Validator(..))
+import OOOOOOOOOORRRRRRRMM.Checksum (checksum)
 import OOOOOOOOOORRRRRRRMM.OpenAI (ChatCompletionRequest(..), ChatCompletionResponse(..), ResponseFormat(..), ccr, createCompletions, message, system, user)
 import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), closeClient, newClient, parsePostgresUrl, runSqlCommand)
 import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript as DoTypescript
 import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript.DoIoTs as DoIoTs
 import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript.DoZod as DoZod
+import OOOOOOOOOORRRRRRRMM.QueriesToRun (generateQueriesToRun)
+import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
 import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
 
 newtype QueryResult = QueryResult { result :: String, success :: Boolean }
@@ -94,7 +97,9 @@ const json = t.recursion('Json', () =>
 )
 """
         else ""
-      ) <> ("""
+      )
+    <>
+      ( """
 type TupleFn = <TCodecs extends readonly [...t.Mixed[]]>(
   codecs: TCodecs,
   name?: string,
@@ -114,7 +119,8 @@ type TupleFn = <TCodecs extends readonly [...t.Mixed[]]>(
   }
 >;
 const tuple: TupleFn = t.tuple as any;
-""")
+"""
+      )
     <> String.replace (String.Pattern "t.json") (String.Replacement "json")
       ( String.replace (String.Pattern "t.date") (String.Replacement "date")
           (String.replace (String.Pattern "t.tuple") (String.Replacement "tuple") s)
@@ -217,9 +223,9 @@ typescript info = do
       case Array.head queryArr of
         Nothing -> pure $ Done unit
         Just q -> do
-          let queryPath = Path.concat [ info.queries, "__raw", q ]
-          log $ "Reading query from " <> queryPath
-          queryText <- readTextFile Encoding.UTF8 queryPath
+          let rawQueryPath = Path.concat [ info.queries, "__raw", q ]
+          log $ "Reading query from " <> rawQueryPath
+          rawQueryText <- readTextFile Encoding.UTF8 rawQueryPath
           let
             systemM = case info.validator of
               Just Zod -> DoZod.system
@@ -228,9 +234,9 @@ typescript info = do
           let moduleName = pascalCase q
           let
             userM = case info.validator of
-              Just Zod -> DoZod.user (DoZod.Schema schema) (DoZod.Query queryText)
-              Just IoTs -> DoIoTs.user (DoIoTs.Schema schema) (DoIoTs.Query queryText)
-              Nothing -> DoTypescript.user (DoTypescript.Schema schema) (DoTypescript.Query queryText)
+              Just Zod -> DoZod.user (DoZod.Schema schema) (DoZod.Query rawQueryText)
+              Just IoTs -> DoIoTs.user (DoIoTs.Schema schema) (DoIoTs.Query rawQueryText)
+              Nothing -> DoTypescript.user (DoTypescript.Schema schema) (DoTypescript.Query rawQueryText)
           ChatCompletionResponse { choices } <- createCompletions
             $ over ChatCompletionRequest
                 _
@@ -250,10 +256,28 @@ typescript info = do
           else do
             log "Creating Typescript file"
             -- now it's safe to write the query
+            let metaPath = Path.concat [ info.queries, "__meta", q ]
+            rawPreviousMeta <- readTextFile Encoding.UTF8 metaPath
+            let queryPath = Path.concat [ info.queries, q ]
+            intentionText <- readTextFile Encoding.UTF8 queryPath
+            case readJSON_ rawPreviousMeta of
+              Just (Metadata { purescript_binding, most_recent_migration_checksum, meta_version, query_text_checksum, result_checksum }) -> writeTextFile Encoding.UTF8 metaPath $ writeJSON $ Metadata
+                { query_text_checksum
+                , result_checksum
+                , meta_version
+                , typescript_binding: Just
+                    { query_text_checksum: checksum intentionText
+                    , result_checksum: checksum rawQueryText
+                    }
+                , purescript_binding
+                , most_recent_migration_checksum
+                }
+              Nothing -> throwError $ error "Could not read meta file"
             let newModulePath = Path.concat ([ info.ts ] <> [ moduleName <> ".ts" ])
             writeTextFile Encoding.UTF8 newModulePath $ dehallucinate info.validator result
             pure $ Loop $ Array.drop 1 queryArr
 
-  tailRecM go (filter (flip Array.elem queryPaths) rawQPaths)
+  queriesToRun <- generateQueriesToRun _.typescript_binding info meta rawQ migrationPaths queryPaths rawQPaths
+  tailRecM go $ compact queriesToRun
   closeClient client
   liftEffect $ close console

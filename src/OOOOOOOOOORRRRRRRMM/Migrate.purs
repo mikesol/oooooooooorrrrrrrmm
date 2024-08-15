@@ -1,4 +1,13 @@
-module OOOOOOOOOORRRRRRRMM.Migrate where
+module OOOOOOOOOORRRRRRRMM.Migrate
+  ( FixQueryResult(..)
+  , MigrationResult(..)
+  , checksum
+  , goQ
+  , migrate
+  , migrationsStartAt0AndIncreaseBy1
+  , pgDumpCmd
+  , startInstanceCmd
+  ) where
 
 import Prelude
 
@@ -10,6 +19,7 @@ import Data.Filterable (filter, filterMap)
 import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (over)
+import Data.String as String
 import Data.String.Extra (kebabCase)
 import Data.Tuple (Tuple)
 import Data.Tuple.Nested ((/\))
@@ -33,6 +43,7 @@ import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), close
 import OOOOOOOOOORRRRRRRMM.Prompts.DoMigration as DoMigration
 import OOOOOOOOOORRRRRRRMM.Prompts.FixQuery (AdditionalContext(..))
 import OOOOOOOOOORRRRRRRMM.Prompts.FixQuery as FixQuery
+import OOOOOOOOOORRRRRRRMM.Schema (schema)
 import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
 
 newtype MigrationResult = MigrationResult { result :: String, success :: Boolean }
@@ -176,19 +187,23 @@ migrate info = do
           migrationText <- readTextFile Encoding.UTF8 migrationPath
           let systemM = DoMigration.system
           let userM = DoMigration.user (DoMigration.Sql schema) (DoMigration.Ask migrationText)
-          ChatCompletionResponse { choices } <- createCompletions
-            $ over ChatCompletionRequest
-                _
-                  { messages =
-                      [ message system systemM
-                      , message user userM
-                      ]
-                  , response_format = pure $ ResponseFormat DoMigration.responseFormat
-                  }
-                ccr
-          MigrationResult { result, success } <- maybe (throwError $ error "No migration could be generated") pure do
-            { message: { content } } <- choices !! 0
-            content >>= readJSON_
+          let isRaw = String.take 6 migrationText == "--raw\n"
+          MigrationResult { result, success } <-
+            if isRaw then pure $ MigrationResult { result: migrationText, success: true }
+            else do
+              ChatCompletionResponse { choices } <- createCompletions
+                $ over ChatCompletionRequest
+                    _
+                      { messages =
+                          [ message system systemM
+                          , message user userM
+                          ]
+                      , response_format = pure $ ResponseFormat DoMigration.responseFormat
+                      }
+                    ccr
+              maybe (throwError $ error "No migration could be generated") pure do
+                { message: { content } } <- choices !! 0
+                content >>= readJSON_
           if not success then do
             log result
             pure $ Done unit
@@ -229,6 +244,7 @@ Press n or N to reject and any other key to continue: """
                             writeTextFile Encoding.UTF8 metaPath $ writeJSON
                               { migration_text_checksum: checksum migrationText
                               , result_checksum: checksum result
+                              , meta_version: 0
                               }
                             pure $ Loop $ Array.drop 1 migrationArr
                         -- revise queries
@@ -236,7 +252,7 @@ Press n or N to reject and any other key to continue: """
                         if (not queriesExists) then cont
                         else do
                           allQueryPrompts <- filter (eq <*> kebabCase) <$> readdir info.queries
-                          allQueries <- filter (flip Array.elem allQueryPrompts) <$> readdir (Path.concat [info.queries, "__raw"])
+                          allQueries <- filter (flip Array.elem allQueryPrompts) <$> readdir (Path.concat [ info.queries, "__raw" ])
                           newQueries' <- tailRecM
                             (goQ migrationIx info schema result)
                             { todo: allQueries, done: [] }
@@ -252,5 +268,11 @@ Press n or N to reject and any other key to continue: """
   tailRecM go (Array.drop (Array.length rawMigrations) migrations)
   closeClient client
   liftEffect $ close console
+  -- at the end of a migration, we always write the human-readable schema
+  schema
+    { humanReadable: true
+    , migrations: info.migrations
+    , path: Path.concat [ info.schema, "schema.sql" ]
+    }
 
 foreign import checksum :: String -> String

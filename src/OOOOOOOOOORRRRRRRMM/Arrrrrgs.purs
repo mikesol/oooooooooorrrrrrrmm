@@ -18,8 +18,13 @@ type Migrate =
   { migrations :: String
   , queries :: String
   , context :: String
+  , schema :: String
   }
 
+type PreCommit = 
+  { migrations :: String
+  , queries :: String
+  }
 type Query =
   { queries :: String
   , migrations :: String
@@ -53,6 +58,7 @@ data Arrrrrgs
   | Question Question
   | BootstrapTmp BootstrapTmp
   | Bootstrap Bootstrap
+  | PreCommit PreCommit
 
 derive instance Generic Arrrrrgs _
 
@@ -72,11 +78,31 @@ migrate = command [ "migrate", "m" ] "Create migrations." do
           [ "--queries", "-q" ]
           "The directory with the queries. All queries must be kebab case. Anything that's not kebab case won't be considered a query and will be ignored."
           # default "queries"
+          , schema:
+        argument
+          [ "--schema", "-s" ]
+          "The directory where the new schema will be written."
+          # default "schema"
     , context:
         argument
           [ "--context", "-c" ]
           "Context needed for the migrations. In the form <query>/<index>, where <query> is the name of the query and <index> is the index of the migration that needs context."
           # default "context"
+    }
+
+preCommit ∷ ArgParser PreCommit
+preCommit = command [ "pre-commit", "pc" ] "A pre-commit hook" do
+  flagHelp *> fromRecord
+    { migrations:
+        argument
+          [ "--migrations", "-m" ]
+          "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
+          # default "migrations"
+    , queries:
+        argument
+          [ "--queries", "-q" ]
+          "The directory with the queries. All queries must be kebab case. Anything that's not kebab case won't be considered a query and will be ignored."
+          # default "queries"
     }
 
 query ∷ ArgParser Query
@@ -225,4 +251,5 @@ parser = choose
   , Question <$> question
   , BootstrapTmp <$> bootstrapTmp
   , Bootstrap <$> bootstrap
+  , PreCommit <$> preCommit
   ]

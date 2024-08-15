@@ -30,9 +30,12 @@ import Node.Path (FilePath)
 import Node.Path as Path
 import Node.ReadLine (close, createConsoleInterface, noCompletion)
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (PureScript)
+import OOOOOOOOOORRRRRRRMM.Checksum (checksum)
 import OOOOOOOOOORRRRRRRMM.OpenAI (ChatCompletionRequest(..), ChatCompletionResponse(..), ResponseFormat(..), ccr, createCompletions, message, system, user)
 import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), closeClient, newClient, parsePostgresUrl, runSqlCommand)
 import OOOOOOOOOORRRRRRRMM.Prompts.DoPurescript as DoPurescript
+import OOOOOOOOOORRRRRRRMM.QueriesToRun (generateQueriesToRun)
+import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
 import Safe.Coerce (coerce)
 import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
 
@@ -167,7 +170,7 @@ pureScript info = do
   let rawM = Path.concat [ info.migrations, "__raw" ]
   rawMExists <- liftEffect $ exists rawM
   rawMigrations' <- if not rawMExists then pure [] else readdir rawM
-  let (rawMigrations :: Array Int )= Array.sort $ compact $ map readJSON_ rawMigrations'
+  let (rawMigrations :: Array Int) = Array.sort $ compact $ map readJSON_ rawMigrations'
   log "Starting postgres 🤓"
   url <- makeAff \f -> do
     void $ exec' startInstanceCmd identity \{ error: e, stdout } -> case e of
@@ -203,13 +206,13 @@ pureScript info = do
       case Array.head queryArr of
         Nothing -> pure $ Done unit
         Just q -> do
-          let queryPath = Path.concat [ info.queries, "__raw", q ]
-          log $ "Reading query from " <> queryPath
-          queryText <- readTextFile Encoding.UTF8 queryPath
+          let rawQueryPath = Path.concat [ info.queries, "__raw", q ]
+          log $ "Reading query from " <> rawQueryPath
+          rawQueryText <- readTextFile Encoding.UTF8 rawQueryPath
           let systemM = DoPurescript.system
           let moduleFileName = pascalCase q
           let moduleName = info.prefix <> "." <> pascalCase q
-          let userM = DoPurescript.user (DoPurescript.Schema schema) (DoPurescript.Query queryText) (DoPurescript.ModuleName moduleName)
+          let userM = DoPurescript.user (DoPurescript.Schema schema) (DoPurescript.Query rawQueryText) (DoPurescript.ModuleName moduleName)
           ChatCompletionResponse { choices } <- createCompletions
             $ over ChatCompletionRequest
                 _
@@ -230,9 +233,27 @@ pureScript info = do
             log "Creating PureScript file"
             -- now it's safe to write the query
             let newModulePath = Path.concat ([ info.ps ] <> splitPrefix <> [ moduleFileName <> ".purs" ])
+            let metaPath = Path.concat [ info.queries, "__meta", q ]
+            rawPreviousMeta <- readTextFile Encoding.UTF8 metaPath
+            let queryPath = Path.concat [ info.queries, q ]
+            intentionText <- readTextFile Encoding.UTF8 queryPath
+            case readJSON_ rawPreviousMeta of
+              Just (Metadata { typescript_binding, most_recent_migration_checksum, meta_version, query_text_checksum, result_checksum }) -> writeTextFile Encoding.UTF8 metaPath $ writeJSON $ Metadata
+                { query_text_checksum
+                , result_checksum
+                , meta_version
+                , purescript_binding: Just
+                    { query_text_checksum: checksum intentionText
+                    , result_checksum: checksum rawQueryText
+                    }
+                , typescript_binding
+                , most_recent_migration_checksum
+                }
+              Nothing -> throwError $ error "Could not read meta file"
             writeTextFile Encoding.UTF8 newModulePath $ dehallucinate (DoPurescript.ModuleName moduleName) result
             pure $ Loop $ Array.drop 1 queryArr
 
-  tailRecM go (filter (flip Array.elem queryPaths) rawQPaths)
+  queriesToRun <- generateQueriesToRun _.purescript_binding info meta rawQ migrationPaths queryPaths rawQPaths
+  tailRecM go $ compact queriesToRun
   closeClient client
   liftEffect $ close console

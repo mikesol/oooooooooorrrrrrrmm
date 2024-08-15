@@ -11,6 +11,7 @@ import Data.Foldable (for_)
 import Data.Maybe (Maybe(..), maybe)
 import Data.Newtype (over)
 import Data.String.Extra (kebabCase)
+import Data.Traversable (for)
 import Effect.Aff (Aff, error, makeAff, throwError)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
@@ -26,9 +27,11 @@ import Node.Path as Path
 import Node.ReadLine (close, createConsoleInterface, noCompletion)
 import Node.ReadLine.Aff (question)
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Query)
+import OOOOOOOOOORRRRRRRMM.Checksum (checksum)
 import OOOOOOOOOORRRRRRRMM.OpenAI (ChatCompletionRequest(..), ChatCompletionResponse(..), ResponseFormat(..), ccr, createCompletions, message, system, user)
 import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), closeClient, newClient, parsePostgresUrl, runSqlCommand)
 import OOOOOOOOOORRRRRRRMM.Prompts.DoQuery as DoQuery
+import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
 import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
 
 newtype QueryResult = QueryResult { result :: String, success :: Boolean }
@@ -80,7 +83,7 @@ query info = do
   let rawM = Path.concat [ info.migrations, "__raw" ]
   rawMExists <- liftEffect $ exists rawM
   rawMigrations' <- if not rawMExists then pure [] else readdir rawM
-  let (rawMigrations :: Array Int )= Array.sort $ compact $ map readJSON_ rawMigrations'
+  let (rawMigrations :: Array Int) = Array.sort $ compact $ map readJSON_ rawMigrations'
   log "Starting postgres 🤓"
   url <- makeAff \f -> do
     void $ exec' startInstanceCmd identity \{ error: e, stdout } -> case e of
@@ -162,14 +165,58 @@ Press n or N to reject and any other key to continue: """
                     let newQueryPath = Path.concat [ rawQ, q ]
                     let metaPath = Path.concat [ meta, q ]
                     writeTextFile Encoding.UTF8 newQueryPath result
-                    writeTextFile Encoding.UTF8 metaPath $ writeJSON
-                      { query_text_checksum: checksum queryText
-                      , result_checksum: checksum result
-                      }
+                    metaPathExists <- liftEffect $ exists metaPath
+                    let mostRecentMigrationPath = Path.concat [ rawM, writeJSON (Array.length migrations - 1) ]
+                    mostRecentMigrationText <- readTextFile Encoding.UTF8 mostRecentMigrationPath
+                    let
+                      writeWithoutMerge = writeTextFile Encoding.UTF8 metaPath $ writeJSON
+                        $ Metadata
+                            { query_text_checksum: checksum queryText
+                            , result_checksum: checksum result
+                            , meta_version: 0
+                            , purescript_binding: Nothing
+                            , typescript_binding: Nothing
+                            , most_recent_migration_checksum: checksum mostRecentMigrationText
+                            }
+                    if metaPathExists then do
+                      rawPreviousMeta <- readTextFile Encoding.UTF8 metaPath
+                      case readJSON_ rawPreviousMeta of
+                        Just (Metadata { typescript_binding, purescript_binding }) -> writeTextFile Encoding.UTF8 metaPath $ writeJSON $ Metadata
+                          { query_text_checksum: checksum queryText
+                          , result_checksum: checksum result
+                          , meta_version: 0
+                          , purescript_binding
+                          , typescript_binding
+                          , most_recent_migration_checksum: checksum mostRecentMigrationText
+                          }
+                        Nothing -> writeWithoutMerge
+                    else do writeWithoutMerge
                     pure $ Loop $ Array.drop 1 queryArr
-
-  tailRecM go (filter (not $ flip Array.elem rawQPaths) queryPaths)
+  mostRecentMigration <- readTextFile Encoding.UTF8 $ Path.concat [ info.migrations, writeJSON (Array.length migrationPaths - 1) ]
+  let mostRecentMigrationChecksum = checksum mostRecentMigration
+  queriesToRun <- for queryPaths \qp -> do
+    let runMe = pure $ Just qp
+    if not (Array.elem qp rawQPaths) then runMe
+    else do
+      qt <- readTextFile Encoding.UTF8 $ Path.concat [ info.queries, qp ]
+      let metaPath = Path.concat [ meta, qp ]
+      let rawPath = Path.concat [ rawQ, qp ]
+      pe <- liftEffect $ exists metaPath
+      if not pe then runMe
+      else do
+        metadata <- readTextFile Encoding.UTF8 metaPath
+        case readJSON_ metadata of
+          Nothing -> runMe
+          Just (Metadata { query_text_checksum, result_checksum, most_recent_migration_checksum }) -> do
+            if mostRecentMigrationChecksum /= most_recent_migration_checksum then runMe
+            else do
+              rw <- liftEffect $ exists rawPath
+              if not rw then runMe
+              else if query_text_checksum /= checksum qt then runMe
+              else do
+                rt <- readTextFile Encoding.UTF8 rawPath
+                if result_checksum /= checksum rt then runMe
+                else pure $ Nothing
+  tailRecM go $ compact queriesToRun
   closeClient client
   liftEffect $ close console
-
-foreign import checksum :: String -> String
