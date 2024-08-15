@@ -5,20 +5,36 @@ workspace:
       dependencies:
         - aff
         - argparse-basic
+        - arrays
         - console
         - effect
+        - either
+        - exceptions
         - filterable
-        - js-date
+        - foldable-traversable
+        - foreign
         - maybe
+        - newtype
+        - node-buffer
         - node-child-process
         - node-fs
         - node-path
+        - node-process
         - node-readline
         - prelude
         - random
+        - safe-coerce
+        - strings
         - strings-extra
+        - tailrec
+        - transformers
+        - tuples
+        - unicode
         - yoga-json
       test_dependencies:
+        - node-event-emitter
+        - node-os
+        - node-streams
         - spec
       build_plan:
         - aff

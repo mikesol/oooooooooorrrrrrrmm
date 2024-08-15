@@ -149,6 +149,7 @@ The bindings require the following PureScript packages to be installed:
 
 - `aff`
 - `foreign`
+- `js-date`
 - `maybe`
 - `yoga-json`
 

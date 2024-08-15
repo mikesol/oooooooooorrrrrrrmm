@@ -3,23 +3,39 @@ package:
   dependencies:
     - aff
     - argparse-basic
+    - arrays
     - console
     - effect
+    - either
+    - exceptions
     - filterable
-    - js-date
+    - foldable-traversable
+    - foreign
     - maybe
+    - newtype
+    - node-buffer
     - node-child-process
     - node-fs
     - node-path
+    - node-process
     - node-readline
     - prelude
     - random
+    - safe-coerce
+    - strings
     - strings-extra
+    - tailrec
+    - transformers
+    - tuples
+    - unicode
     - yoga-json
   test:
     main: Test.Main
     dependencies:
       - spec
+      - node-streams
+      - node-os
+      - node-event-emitter
 workspace:
   packageSet:
     registry: 56.4.0

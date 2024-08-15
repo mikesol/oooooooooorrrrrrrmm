@@ -1,0 +1,64 @@
+name: Test
+
+on:
+  - push
+  - pull_request
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+        OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PostgreSQL
+        uses: tj-actions/install-postgresql@v3
+        with:
+          postgresql-version: 16
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y make gcc
+
+      - name: Install EphemeralPG
+        run: |
+            git clone https://github.com/eradman/ephemeralpg
+            cd ephemeralpg
+            sudo make install
+
+      - name: Verify installation
+        run: |
+            uri=$(pg_tmp)
+            echo $uri
+      - name: Cache purescript dependencies
+        uses: actions/cache@v2
+        with:
+          path: |
+            ~/.npm
+            .spago
+            ${{ env.spago_global_cache }}
+            output
+          key: >-
+            ${{ hashFiles('pnpm-lock.yaml') }}-
+            ${{ hashFiles('spago.yaml') }}
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        id: pnpm-install
+        with:
+          version: 7.13.2
+          run_install: false
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Install
+        run: pnpm i
+
+      - name: Build source
+        run: pnpm spago build --pedantic-packages
+
+      - name: Test
+        run: pnpm spago t

@@ -75,7 +75,7 @@ main = launchAff_ $ runSpec' (defaultConfig { timeout = Just $ Milliseconds (60_
         spawnInTmp "pnpm" [ "i", "-D", "typescript", "purescript", "spago@next" ]
         spawnInTmp "pnpm" [ "tsc", "--init" ]
         spawnInTmp "pnpm" [ "spago", "init" ]
-        spawnInTmp "pnpm" [ "spago", "install", "yoga-json", "foreign", "aff", "maybe" ]
+        spawnInTmp "pnpm" [ "spago", "install", "yoga-json", "foreign", "aff", "maybe", "js-date" ]
         liftEffect cwd >>= \c -> spawnInTmp "pnpm" [ "i", "-D", c ]
         let migrationDir = Path.concat [tmp, "migrations"]
         let queryDir = Path.concat [tmp, "queries"]
