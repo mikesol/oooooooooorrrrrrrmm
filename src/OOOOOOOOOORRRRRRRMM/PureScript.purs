@@ -33,13 +33,20 @@ import Node.Path as Path
 import Node.ReadLine (close, createConsoleInterface, noCompletion)
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (PureScript)
 import OOOOOOOOOORRRRRRRMM.Checksum (checksum)
-import OOOOOOOOOORRRRRRRMM.OpenAI (ChatCompletionRequest(..), ChatCompletionResponse(..), ResponseFormat(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.Completions (ChatCompletionRequest(..), ChatCompletionResponse(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.ConvertToResult (convertToResult)
 import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), closeClient, newClient, parsePostgresUrl, runSqlCommand)
 import OOOOOOOOOORRRRRRRMM.Prompts.DoPurescript as DoPurescript
 import OOOOOOOOOORRRRRRRMM.QueriesToRun (generateQueriesToRun)
 import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
 import Safe.Coerce (coerce)
 import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
+
+removeLLMGeneratedImports :: String -> String
+removeLLMGeneratedImports s = String.joinWith "\n" withoutImports
+  where
+  split = String.split (String.Pattern "\n") s
+  withoutImports = Array.filter (notEq "import " <<< String.take 7) split
 
 dehallucinate :: DoPurescript.ModuleName -> String -> String
 dehallucinate (DoPurescript.ModuleName moduleName) s = firstPart <> secondPart
@@ -77,7 +84,8 @@ dehallucinate (DoPurescript.ModuleName moduleName) s = firstPart <> secondPart
     $ String.replaceAll (String.Pattern "```") (String.Replacement "")
     $ String.replaceAll (String.Pattern "```purescript") (String.Replacement "")
     $ String.replaceAll (String.Pattern "type I = {}") (String.Replacement "")
-    $ String.replaceAll (String.Pattern "type O = {}") (String.Replacement "") s
+    $ String.replaceAll (String.Pattern "type O = {}") (String.Replacement "")
+    $ removeLLMGeneratedImports s
   secondPart
     | oIsEmpty =
         """
@@ -223,19 +231,18 @@ pureScript info = do
           let moduleFileName = pascalCase q
           let moduleName = info.prefix <> "." <> pascalCase q
           let userM = DoPurescript.user (DoPurescript.Schema schema) (DoPurescript.Query rawQueryText) (DoPurescript.ModuleName moduleName)
-          ChatCompletionResponse { choices } <- createCompletions
+          ChatCompletionResponse { choices } <- createCompletions info.url info.token
             $ over ChatCompletionRequest
                 _
                   { messages =
                       [ message system systemM
                       , message user userM
                       ]
-                  , response_format = pure $ ResponseFormat DoPurescript.responseFormat
                   }
                 ccr
-          QueryResult { result, success } <- maybe (throwError $ error "No PureScript could be generated") pure do
+          { result, success } <- maybe (throwError $ error "No PureScript could be generated") pure do
             { message: { content } } <- choices !! 0
-            content >>= readJSON_
+            pure (convertToResult content)
           if not success then do
             log result
             pure $ Done unit

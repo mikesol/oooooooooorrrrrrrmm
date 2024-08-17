@@ -24,14 +24,11 @@ import Node.Path (FilePath)
 import Node.Path as Path
 import Node.ReadLine (close, createConsoleInterface, noCompletion)
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Schema)
-import OOOOOOOOOORRRRRRRMM.OpenAI (ChatCompletionRequest(..), ChatCompletionResponse(..), ResponseFormat(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.Completions (ChatCompletionRequest(..), ChatCompletionResponse(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.ConvertToResult (convertToResult)
 import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), closeClient, newClient, parsePostgresUrl, runSqlCommand)
 import OOOOOOOOOORRRRRRRMM.Prompts.DoSchema as DoSchema
-import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
-
-newtype SchemaResult = SchemaResult { result :: String, success :: Boolean }
-
-derive newtype instance ReadForeign SchemaResult
+import Yoga.JSON (readJSON_, writeJSON)
 
 startInstanceCmd :: String
 startInstanceCmd = "pg_tmp -t"
@@ -102,19 +99,18 @@ schema info = do
     sc <- readTextFile Encoding.UTF8 schemaPath
     let systemM = DoSchema.system
     let userM = DoSchema.user (DoSchema.Schema sc)
-    ChatCompletionResponse { choices } <- createCompletions
+    ChatCompletionResponse { choices } <- createCompletions info.url info.token
       $ over ChatCompletionRequest
           _
             { messages =
                 [ message system systemM
                 , message user userM
                 ]
-            , response_format = pure $ ResponseFormat DoSchema.responseFormat
             }
           ccr
-    SchemaResult { result, success } <- maybe (throwError $ error "No migration could be generated") pure do
+    { result, success } <- maybe (throwError $ error "No migration could be generated") pure do
       { message: { content } } <- choices !! 0
-      content >>= readJSON_
+      pure (convertToResult content)
     if not success then do
       log result
     else do

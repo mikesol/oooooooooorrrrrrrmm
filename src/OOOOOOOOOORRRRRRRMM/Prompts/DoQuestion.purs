@@ -2,8 +2,6 @@ module OOOOOOOOOORRRRRRRMM.Prompts.DoQuestion where
 
 import Prelude
 
-import Foreign (Foreign)
-import Yoga.JSON (writeImpl)
 
 newtype Schema = Schema String
 
@@ -28,25 +26,3 @@ A user has the following question about the schema:
 
 Please provide a concise, easy-to-understand answer about the question based on the schema.
 """
-
-responseFormat :: Foreign
-responseFormat = writeImpl
-  { "type": "json_schema"
-  , "json_schema":
-      { "name": "query_response"
-      , "strict": true
-      , "schema":
-          { "type": "object"
-          , "additionalProperties": false
-          , "properties":
-              { "result":
-                  { "type": "string"
-                  }
-              , "success":
-                  { "type": "boolean"
-                  }
-              }
-          , "required": [ "result", "success" ]
-          }
-      }
-  }

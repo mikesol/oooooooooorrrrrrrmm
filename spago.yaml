@@ -29,6 +29,7 @@ package:
     - transformers
     - tuples
     - unicode
+    - yoga-fetch
     - yoga-json
   test:
     main: Test.Main

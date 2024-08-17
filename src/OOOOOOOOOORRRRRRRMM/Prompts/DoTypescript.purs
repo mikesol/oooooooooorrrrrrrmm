@@ -2,8 +2,6 @@ module OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript where
 
 import Prelude
 
-import Foreign (Foreign)
-import Yoga.JSON (writeImpl)
 
 newtype Schema = Schema String
 newtype Query = Query String
@@ -70,27 +68,5 @@ For each postgres type, here is the equivalent Typescript type:
 
 Arrays should be arrays of these things. Stuff that can be `null` types should be optional types of these things.
 
-Please generate the complete Typescript file with nothing extra (success=true). If you cant, please send back why (success=false).
+Please generate the complete Typescript file in backticks. If you can't, please send the reason why.
 """
-
-responseFormat :: Foreign
-responseFormat = writeImpl
-  { "type": "json_schema"
-  , "json_schema":
-      { "name": "query_response"
-      , "strict": true
-      , "schema":
-          { "type": "object"
-          , "additionalProperties": false
-          , "properties":
-              { "result":
-                  { "type": "string"
-                  }
-              , "success":
-                  { "type": "boolean"
-                  }
-              }
-          , "required": [ "result", "success" ]
-          }
-      }
-  }

@@ -2,8 +2,6 @@ module OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript.DoIoTs where
 
 import Prelude
 
-import Foreign (Foreign)
-import Yoga.JSON (writeImpl)
 
 newtype Schema = Schema String
 newtype Query = Query String
@@ -34,19 +32,15 @@ Please generate typescript bindings for this query. The bindings should follow t
 <typescript>
 
 export const i = ... // input type defined using io-ts
-export type Q = `"""
+export const q = t.literal(`"""
     <> query
     <>
-      """`;
-export const q: Q = `"""
-    <> query
-    <>
-      """`;
+      """`);
 export const o = ... // output type
-export const run = (f: (s: string, v: any) => Promise<any>) => (data: t.TypeOf<typeof i>) => f(q, [...]).then(x => o.decode(x));
+export const run = (f: (s: string, v: any) => Promise<any>) => (data: t.TypeOf<typeof i>) => f(q.value, [...]).then(x => o.decode(x));
 </typescript>
 
-As you can see, the query Q just needs to be quoted verbatim, as Typescript allows for typelevel strings. Ditto for `q`.
+As you can see, the literal q just needs to be quoted verbatim in the io-ts literal.
 
 For i, this should be a t.type with as many entries as there are input. For example, if the query has wildcards $1 and $2, where $1 is supposed to represent an email address of type string and $2 is supposed to represent a verified status of type boolean, the input io-ts validator should be:
 
@@ -89,27 +83,5 @@ For each postgres type, here is the equivalent io-ts binding namespaced by t. I'
 
 Arrays should be t.array() of these things. Types that can be `null` types should use a union between the type and t.null.
 
-Please generate the complete Typescript file with nothing extra (success=true). If you can't, please send back why (success=false).
+Please generate the complete Typescript file in backticks. If you can't, please send the reason why.
 """
-
-responseFormat :: Foreign
-responseFormat = writeImpl
-  { "type": "json_schema"
-  , "json_schema":
-      { "name": "query_response"
-      , "strict": true
-      , "schema":
-          { "type": "object"
-          , "additionalProperties": false
-          , "properties":
-              { "result":
-                  { "type": "string"
-                  }
-              , "success":
-                  { "type": "boolean"
-                  }
-              }
-          , "required": [ "result", "success" ]
-          }
-      }
-  }

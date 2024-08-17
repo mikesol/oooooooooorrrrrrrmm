@@ -4,7 +4,7 @@ An ORM.
 
 ## Prerequisites
 
-1. Get an [OpenAI API key](https://help.openai.com/en/articles/4936850-where-do-i-find-my-openai-api-key). To avoid needing to specify the key for every request, check out the tips in [this guide](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety).
+1. Get an [Completions API key](https://help.openai.com/en/articles/4936850-where-do-i-find-my-openai-api-key). To avoid needing to specify the key for every request, check out the tips in [this guide](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety).
 
 2. Install `postgresql` via `apt` or `brew`.
 

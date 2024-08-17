@@ -71,7 +71,7 @@ main = launchAff_ $ runSpec' (defaultConfig { timeout = Just $ Milliseconds (60_
         log $ "Running test in " <> tmp
         let spawnInTmp cmd args = simpleSpawn cmd args _ { cwd = Just tmp }
         spawnInTmp "pnpm" [ "init" ]
-        spawnInTmp "pnpm" [ "i", "zod", "io-ts" ]
+        spawnInTmp "pnpm" [ "i", "zod", "io-ts", "fp-ts" ]
         spawnInTmp "pnpm" [ "i", "-D", "typescript", "purescript", "spago@next" ]
         spawnInTmp "pnpm" [ "tsc", "--init" ]
         spawnInTmp "pnpm" [ "spago", "init" ]

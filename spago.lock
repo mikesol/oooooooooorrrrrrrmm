@@ -31,6 +31,7 @@ workspace:
         - transformers
         - tuples
         - unicode
+        - yoga-fetch
         - yoga-json
       test_dependencies:
         - node-event-emitter
@@ -39,6 +40,7 @@ workspace:
         - spec
       build_plan:
         - aff
+        - aff-promise
         - ansi
         - argparse-basic
         - arraybuffer-types
@@ -115,6 +117,7 @@ workspace:
         - unicode
         - unsafe-coerce
         - variant
+        - yoga-fetch
         - yoga-json
         - yoga-tree
   package_set:
@@ -645,6 +648,13 @@ packages:
       - tailrec
       - transformers
       - unsafe-coerce
+  aff-promise:
+    type: registry
+    version: 4.0.0
+    integrity: sha256-Kq5EupbUpXeUXx4JqGQE7/RTTz/H6idzWhsocwlEFhM=
+    dependencies:
+      - aff
+      - foreign
   ansi:
     type: registry
     version: 7.0.0
@@ -1496,6 +1506,21 @@ packages:
       - prelude
       - record
       - tuples
+      - unsafe-coerce
+  yoga-fetch:
+    type: registry
+    version: 1.0.1
+    integrity: sha256-0sD59gMzK6c54uss/NXSTmnaUJqn7R5vtyekywd60HU=
+    dependencies:
+      - aff
+      - aff-promise
+      - arraybuffer-types
+      - effect
+      - foreign
+      - foreign-object
+      - newtype
+      - prelude
+      - typelevel-prelude
       - unsafe-coerce
   yoga-json:
     type: registry

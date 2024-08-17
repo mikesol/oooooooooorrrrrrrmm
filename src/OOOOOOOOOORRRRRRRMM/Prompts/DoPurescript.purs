@@ -2,8 +2,6 @@ module OOOOOOOOOORRRRRRRMM.Prompts.DoPurescript where
 
 import Prelude
 
-import Foreign (Foreign)
-import Yoga.JSON (writeImpl)
 
 newtype Schema = Schema String
 newtype Query = Query String
@@ -76,27 +74,5 @@ For each postgres type, here is the equivalent PureScript type:
 
 Arrays should be arrays of these things. Stuff that can be `null` types should be Maybe in I and O.
 
-Please generate the complete PureScript file with nothing extra (success=true). Do not put it in backticks or xml, just the raw PureScript file. If you cant, please send back why (success=false).
+Please generate the complete PureScript file in backticks. If you cant, please send back why.
 """
-
-responseFormat :: Foreign
-responseFormat = writeImpl
-  { "type": "json_schema"
-  , "json_schema":
-      { "name": "query_response"
-      , "strict": true
-      , "schema":
-          { "type": "object"
-          , "additionalProperties": false
-          , "properties":
-              { "result":
-                  { "type": "string"
-                  }
-              , "success":
-                  { "type": "boolean"
-                  }
-              }
-          , "required": [ "result", "success" ]
-          }
-      }
-  }

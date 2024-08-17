@@ -27,25 +27,29 @@ import Node.Path as Path
 import Node.ReadLine (close, createConsoleInterface, noCompletion)
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Typescript, Validator(..))
 import OOOOOOOOOORRRRRRRMM.Checksum (checksum)
-import OOOOOOOOOORRRRRRRMM.OpenAI (ChatCompletionRequest(..), ChatCompletionResponse(..), ResponseFormat(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.Completions (ChatCompletionRequest(..), ChatCompletionResponse(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.ConvertToResult (convertToResult)
 import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), closeClient, newClient, parsePostgresUrl, runSqlCommand)
 import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript as DoTypescript
 import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript.DoIoTs as DoIoTs
 import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript.DoZod as DoZod
 import OOOOOOOOOORRRRRRRMM.QueriesToRun (generateQueriesToRun)
 import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
-import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
+import Yoga.JSON (readJSON_, writeJSON)
 
-newtype QueryResult = QueryResult { result :: String, success :: Boolean }
-
-derive newtype instance ReadForeign QueryResult
+removeLLMGeneratedImports :: String -> String
+removeLLMGeneratedImports s = String.joinWith "\n" withoutImports
+  where
+  split = String.split (String.Pattern "\n") s
+  withoutImports = Array.filter (notEq "import " <<< String.take 7) split
 
 dehallucinate :: Maybe Validator -> String -> String
 dehallucinate mv ss = go mv
   $ String.replaceAll (String.Pattern "```") (String.Replacement "")
   $ String.replaceAll (String.Pattern "<typescript>") (String.Replacement "")
   $ String.replaceAll (String.Pattern "</typescript>") (String.Replacement "")
-  $ String.replaceAll (String.Pattern "```typescript") (String.Replacement "") ss
+  $ String.replaceAll (String.Pattern "```typescript") (String.Replacement "")
+  $ removeLLMGeneratedImports ss
   where
   go (Just Zod) s = (if zodIsImported then "" else "import { z } from 'zod';")
     <>
@@ -61,10 +65,10 @@ const json: z.ZodType<Json> = z.lazy(() =>
 """
         else ""
       )
-    <> String.replaceAll (String.Pattern "z.json()") (String.Replacement "json") s
+    <> (String.replaceAll (String.Pattern "[z.Json()") (String.Replacement "[json") $ String.replaceAll (String.Pattern "z.Json()]") (String.Replacement "json]") $ String.replaceAll (String.Pattern "z.json()") (String.Replacement "json") s)
     where
     zodIsImported = isJust (String.indexOf (String.Pattern "from 'zod'") s) || isJust (String.indexOf (String.Pattern "from \"zod\"") s)
-    usesJson = isJust (String.indexOf (String.Pattern "z.json") s)
+    usesJson = isJust (String.indexOf (String.Pattern "json") s) || isJust (String.indexOf (String.Pattern "Json") s)
   go (Just IoTs) s = (if ioTsIsImported then "" else "import * as t from 'io-ts';")
     <>
       ( if usesDate then
@@ -98,12 +102,16 @@ const json: t.Type<Json> = t.recursion('Json', () =>
 """
         else ""
       )
-    <> String.replaceAll (String.Pattern "t.json") (String.Replacement "json")
-      ( String.replaceAll (String.Pattern "t.date") (String.Replacement "date") s)
+    <>
+      ( String.replaceAll (String.Pattern "[Json") (String.Replacement "[json") $ String.replaceAll (String.Pattern "Json]") (String.Replacement "json]") $ String.replaceAll (String.Pattern "t.json") (String.Replacement "json")
+          $ String.replaceAll (String.Pattern "[Date") (String.Replacement "[date")
+          $ String.replaceAll (String.Pattern "Date]") (String.Replacement "date]")
+          $ String.replaceAll (String.Pattern "t.date") (String.Replacement "date") s
+      )
     where
     ioTsIsImported = isJust (String.indexOf (String.Pattern "from 'io-ts'") s) || isJust (String.indexOf (String.Pattern "from \"io-ts\"") s)
-    usesJson = isJust (String.indexOf (String.Pattern "t.json") s)
-    usesDate = isJust (String.indexOf (String.Pattern "t.date") s)
+    usesJson = isJust (String.indexOf (String.Pattern "json") s) || isJust (String.indexOf (String.Pattern "Json") s)
+    usesDate = isJust (String.indexOf (String.Pattern "date") s) || isJust (String.indexOf (String.Pattern "Date") s)
   go Nothing s = s
 
 startInstanceCmd :: String
@@ -133,7 +141,7 @@ migrationsStartAt0AndIncreaseBy1 = go 0
 typescript :: Typescript -> Aff Unit
 typescript info = do
   pthExists <- liftEffect $ exists info.ts
-  when (not pthExists)  do
+  when (not pthExists) do
     void $ mkdir info.ts
   console <- liftEffect $ createConsoleInterface noCompletion
   migrationPaths <- readdir info.migrations
@@ -204,19 +212,18 @@ typescript info = do
               Just Zod -> DoZod.user (DoZod.Schema schema) (DoZod.Query rawQueryText)
               Just IoTs -> DoIoTs.user (DoIoTs.Schema schema) (DoIoTs.Query rawQueryText)
               Nothing -> DoTypescript.user (DoTypescript.Schema schema) (DoTypescript.Query rawQueryText)
-          ChatCompletionResponse { choices } <- createCompletions
+          ChatCompletionResponse { choices } <- createCompletions info.url info.token
             $ over ChatCompletionRequest
                 _
                   { messages =
                       [ message system systemM
                       , message user userM
                       ]
-                  , response_format = pure $ ResponseFormat DoTypescript.responseFormat
                   }
                 ccr
-          QueryResult { result, success } <- maybe (throwError $ error "No typescript could be generated") pure do
+          { result, success } <- maybe (throwError $ error "No typescript could be generated") pure do
             { message: { content } } <- choices !! 0
-            content >>= readJSON_
+            pure (convertToResult content)
           if not success then do
             log result
             pure $ Done unit
@@ -244,7 +251,7 @@ typescript info = do
             writeTextFile Encoding.UTF8 newModulePath $ dehallucinate info.validator result
             pure $ Loop $ Array.drop 1 queryArr
 
-  queriesToRun <- generateQueriesToRun ( Path.concat <<< ([ info.ts ] <> _) <<< pure <<< (_ <> ".ts") <<< pascalCase) _.typescript_binding info meta rawQ migrations queryPaths rawQPaths
+  queriesToRun <- generateQueriesToRun (Path.concat <<< ([ info.ts ] <> _) <<< pure <<< (_ <> ".ts") <<< pascalCase) _.typescript_binding info meta rawQ migrations queryPaths rawQPaths
   tailRecM go $ compact queriesToRun
   closeClient client
   liftEffect $ close console

@@ -2,8 +2,6 @@ module OOOOOOOOOORRRRRRRMM.Prompts.DoSchema where
 
 import Prelude
 
-import Foreign (Foreign)
-import Yoga.JSON (writeImpl)
 
 newtype Schema = Schema String
 system :: String
@@ -40,27 +38,5 @@ Some things to remove are:
 
 Basically, the only thing that should be left is the CREATE TABLE statements, the CREATE INDEX statements, and any triggers (if they look like they were made by a human). Also, please remove unnecessary namespacing, for example "public." if not needed.
 
-Please remove that and send back _only_ the human readable schema as the result without any additions (no xml, no quotation marks around the schema, etc). Also, when appropriate, add light comments clarifying what's going on (ie what the intention of a particular trigger or function is).
+Please send back the human-readable schema in backticks.
 """
-
-responseFormat :: Foreign
-responseFormat = writeImpl
-  { "type": "json_schema"
-  , "json_schema":
-      { "name": "query_response"
-      , "strict": true
-      , "schema":
-          { "type": "object"
-          , "additionalProperties": false
-          , "properties":
-              { "result":
-                  { "type": "string"
-                  }
-              , "success":
-                  { "type": "boolean"
-                  }
-              }
-          , "required": [ "result", "success" ]
-          }
-      }
-  }
