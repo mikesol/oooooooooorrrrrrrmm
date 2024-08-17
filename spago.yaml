@@ -13,7 +13,6 @@ package:
     - foldable-traversable
     - foreign
     - foreign-object
-    - lists
     - maybe
     - newtype
     - node-buffer

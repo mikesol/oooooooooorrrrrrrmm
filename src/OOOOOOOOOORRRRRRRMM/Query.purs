@@ -123,8 +123,8 @@ query info = do
           let queryPath = Path.concat [ info.queries, q ]
           log $ "Reading query from " <> queryPath
           queryText <- readTextFile Encoding.UTF8 queryPath
-          let systemM = DoQuery.system
-          let userM = DoQuery.user (DoQuery.Sql schema) (DoQuery.Ask queryText)
+          let systemM = DoQuery.system (DoQuery.Sql schema)
+          let userM = DoQuery.user (DoQuery.Ask queryText)
           ChatCompletionResponse { choices } <- createCompletions info.url info.token
             $ over ChatCompletionRequest
                 _

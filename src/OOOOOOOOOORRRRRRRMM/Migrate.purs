@@ -90,8 +90,8 @@ goQ migrationIx info schema migrationResult { todo, done } = Array.head todo # m
   context <-
     if contextExists then Just <<< AdditionalContext <$> readTextFile Encoding.UTF8 contextPath
     else pure Nothing
-  let systemM = FixQuery.system
-  let userM = FixQuery.user (FixQuery.Sql schema) (FixQuery.Migration migrationResult) (FixQuery.Intention intentionText) (FixQuery.Query queryText) context
+  let systemM = FixQuery.system (FixQuery.Sql schema) (FixQuery.Migration migrationResult)
+  let userM = FixQuery.user (FixQuery.Intention intentionText) (FixQuery.Query queryText) context
   ChatCompletionResponse { choices } <- createCompletions info.url info.token
     $ over ChatCompletionRequest
         _
@@ -192,8 +192,8 @@ migrate info = do
         Just migrationIx -> do
           let migrationPath = Path.concat [ info.migrations, show migrationIx ]
           migrationText <- readTextFile Encoding.UTF8 migrationPath
-          let systemM = DoMigration.system
-          let userM = DoMigration.user (DoMigration.Sql schema) (DoMigration.Ask migrationText)
+          let systemM = DoMigration.system (DoMigration.Sql schema) 
+          let userM = DoMigration.user (DoMigration.Ask migrationText)
           let isRaw = String.take 6 migrationText == "--raw\n"
           let
             cc retries = do
@@ -234,7 +234,7 @@ Press y or Y to accept and any other key to reject: """
                         log "Oh noes! Please change your prompt and try again."
                         pure $ Done unit
                     | otherwise -> do
-                        log $ if info.yes then "Creating migration 📄\n<migration>\n" <> result <> "\n</migration>\n" else "Great! Creating migration 📄"
+                        log $ if info.yes then "Creating migration "<>writeJSON migrationIx<>" 📄\n<migration>\n" <> result <> "\n</migration>\n" else "Great! Creating migration 📄"
                         cmd <- try $ runSqlCommand client result mempty
                         case cmd of
                           Left _ -> do

@@ -7,15 +7,18 @@ import Data.Array ((!!))
 import Data.Array as Array
 import Data.Either (Either(..))
 import Data.Filterable (compact, filter, filterMap)
-import Data.Foldable (for_)
+import Data.Foldable (for_, intercalate)
 import Data.Maybe (Maybe(..), isJust, maybe)
-import Data.Newtype (over)
+import Data.Newtype (over, unwrap)
 import Data.String as String
 import Data.String.Extra (kebabCase, pascalCase)
+import Data.Tuple (fst, snd)
+import Data.Tuple.Nested ((/\))
 import Effect.Aff (Aff, error, makeAff, throwError)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Random (randomInt)
+import Foreign.Object as Object
 import Node.Buffer (toString)
 import Node.ChildProcess (exec')
 import Node.Encoding (Encoding(..))
@@ -29,50 +32,189 @@ import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Typescript, Validator(..))
 import OOOOOOOOOORRRRRRRMM.Checksum (checksum)
 import OOOOOOOOOORRRRRRRMM.Completions (ChatCompletionRequest(..), ChatCompletionResponse(..), ccr, createCompletions, message, system, user)
 import OOOOOOOOOORRRRRRRMM.ConvertToResult (convertToResult)
+import OOOOOOOOOORRRRRRRMM.PGInfo (InputParameter(..), OutputColumn(..), PostgresQuerySchema(..), PostgresType(..))
 import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), closeClient, newClient, parsePostgresUrl, runSqlCommand)
-import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript as DoTypescript
-import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript.DoIoTs as DoIoTs
-import OOOOOOOOOORRRRRRRMM.Prompts.DoTypescript.DoZod as DoZod
+import OOOOOOOOOORRRRRRRMM.Prompts.DoBinding as DoBinding
 import OOOOOOOOOORRRRRRRMM.QueriesToRun (generateQueriesToRun)
 import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
-import Yoga.JSON (readJSON_, writeJSON)
+import Yoga.JSON (class ReadForeign, readJSON, readJSON_, writeJSON)
 
-removeLLMGeneratedImports :: String -> String
-removeLLMGeneratedImports s = String.joinWith "\n" withoutImports
-  where
-  split = String.split (String.Pattern "\n") s
-  withoutImports = Array.filter (notEq "import " <<< String.take 7) split
+toNonValidatedType :: PostgresType -> String
+toNonValidatedType = case _ of
+  PGBoolean -> "boolean"
+  PGInteger -> "number"
+  PGTimestamp -> "Date"
+  PGTimestampz -> "Date"
+  PGJson -> "Json"
+  PGText -> "string"
+  PGVarchar -> "string"
+  PGNumeric -> "number"
+  PGUuid -> "string"
+  PGBytea -> "string"
+  PGDate -> "Date"
+  PGTime -> "Date"
+  PGTimetz -> "Date"
+  PGInterval -> "string"
+  PGRecord -> "any"
+  PGEnum -> "string"
+  PGTsvector -> "string"
+  PGTsquery -> "string"
+toIoTsType :: PostgresType -> String
+toIoTsType = case _ of
+  PGBoolean -> "t.boolean"
+  PGInteger -> "t.number"
+  PGTimestamp -> "date"
+  PGTimestampz -> "date"
+  PGJson -> "json"
+  PGText -> "t.string"
+  PGVarchar -> "t.string"
+  PGNumeric -> "t.number"
+  PGUuid -> "t.string"
+  PGBytea -> "t.string"
+  PGDate -> "date"
+  PGTime -> "date"
+  PGTimetz -> "date"
+  PGInterval -> "t.string"
+  PGRecord -> "t.any"
+  PGEnum -> "t.string"
+  PGTsvector -> "t.string"
+  PGTsquery -> "t.string"
 
-dehallucinate :: Maybe Validator -> String -> String
-dehallucinate mv ss = go mv
-  $ String.replaceAll (String.Pattern "```") (String.Replacement "")
-  $ String.replaceAll (String.Pattern "<typescript>") (String.Replacement "")
-  $ String.replaceAll (String.Pattern "</typescript>") (String.Replacement "")
-  $ String.replaceAll (String.Pattern "```typescript") (String.Replacement "")
-  $ removeLLMGeneratedImports ss
+toZodType :: PostgresType -> String
+toZodType = case _ of
+  PGBoolean -> "z.boolean()"
+  PGInteger -> "z.number()"
+  PGTimestamp -> "z.string()"
+  PGTimestampz -> "z.date()"
+  PGJson -> "json"
+  PGText -> "z.string()"
+  PGVarchar -> "z.string()"
+  PGNumeric -> "z.number()"
+  PGUuid -> "z.string()"
+  PGBytea -> "z.string()"
+  PGDate -> "z.date()"
+  PGTime -> "z.date()"
+  PGTimetz -> "z.date()"
+  PGInterval -> "z.string()"
+  PGRecord -> "z.any()"
+  PGEnum -> "z.string()"
+  PGTsvector -> "z.string()"
+  PGTsquery -> "z.string()"
+
+codegenNoValidator :: String -> PostgresQuerySchema -> String
+codegenNoValidator query (PostgresQuerySchema { input: input, output: output }) = intercalate "\n"
+  [ if hasJson then
+      """
+type JsonPrimative = string | number | boolean | null;
+type JsonArray = Json[];
+type JsonObject = { [key: string]: Json };
+type JsonComposite = JsonArray | JsonObject;
+type Json = JsonPrimative | JsonComposite;
+"""
+    else ""
+  , iPart
+  , qPart
+  , oPart
+  ]
+
   where
-  go (Just Zod) s = (if zodIsImported then "" else "import { z } from 'zod';")
-    <>
-      ( if usesJson then
-          """
+  hasJson = isJust $ Array.find (eq PGJson) (map (unwrap >>> _.type) (Object.values input) <> map (unwrap >>> _.type) (Object.values output))
+
+  iPart =
+    if Object.isEmpty input then ""
+    else "export type I = { "
+      <> String.joinWith "\n"
+        ( map
+            ( \(k /\ (InputParameter v)) ->
+                "  " <> k <> (if v.is_nullable then "?" else "") <> ": " <> toNonValidatedType v.type <> (if v.is_array then "[]" else "") <> ";"
+            )
+            (Object.toUnfoldable input)
+        )
+      <> "\n };\n"
+  qPart = "export type Q = `\n" <> query <> "\n`;\n"
+  oPart =
+    if Object.isEmpty output then ""
+    else "export type O = { "
+      <> String.joinWith "\n"
+        ( map
+            ( \(k /\ (OutputColumn v)) ->
+                "  " <> k <> (if v.is_nullable then "?" else "") <> ": " <> toNonValidatedType v.type <> (if v.is_array then "[]" else "") <> ";"
+            )
+            (Object.toUnfoldable output)
+        )
+      <> "\n };\n"
+
+codegenZod :: String -> PostgresQuerySchema -> String
+codegenZod query (PostgresQuerySchema { input: input, output: output }) = intercalate "\n"
+  [ firstPart
+  , if hasJson then
+      """
 const literalSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 type Literal = z.infer<typeof literalSchema>;
 type Json = Literal | { [key: string]: Json } | Json[];
 const json: z.ZodType<Json> = z.lazy(() =>
   z.union([literalSchema, z.array(json), z.record(json)])
 );
-
 """
-        else ""
-      )
-    <> (String.replaceAll (String.Pattern "[z.Json()") (String.Replacement "[json") $ String.replaceAll (String.Pattern "z.Json()]") (String.Replacement "json]") $ String.replaceAll (String.Pattern "z.json()") (String.Replacement "json") s)
-    where
-    zodIsImported = isJust (String.indexOf (String.Pattern "from 'zod'") s) || isJust (String.indexOf (String.Pattern "from \"zod\"") s)
-    usesJson = isJust (String.indexOf (String.Pattern "json") s) || isJust (String.indexOf (String.Pattern "Json") s)
-  go (Just IoTs) s = (if ioTsIsImported then "" else "import * as t from 'io-ts';")
-    <>
-      ( if usesDate then
-          """
+    else ""
+  , iPart
+  , qPart
+  , oPart
+  , secondPart
+  ]
+
+  where
+  iIsEmpty = Object.isEmpty input
+  hasJson = isJust $ Array.find (eq PGJson) (map (unwrap >>> _.type) (Object.values input) <> map (unwrap >>> _.type) (Object.values output))
+  columnNamesInOrder = map fst (Array.sortWith (snd >>> unwrap >>> _.position_starting_from_1) (Object.toUnfoldable input))
+  myITerm
+    | Array.length columnNamesInOrder == 0 = ""
+    | otherwise = String.joinWith ", "
+        $ map (\i -> "$i." <> i) columnNamesInOrder
+  oIsEmpty = Object.isEmpty output
+
+  firstPart = "import { z } from 'zod';\n"
+  iPart =
+    if Object.isEmpty input then ""
+    else "export const i = z.object({ "
+      <> String.joinWith ",\n"
+        ( map
+            ( \(k /\ (InputParameter v)) ->
+                "  " <> k <> " : " <> (if v.is_array then "z.array(" else "") <> toZodType v.type <> (if v.is_nullable then ".nullable()" else "") <> (if v.is_array then ")" else "")
+            )
+            (Object.toUnfoldable input)
+        )
+      <> "\n });\n"
+  qPart = "export const q = z.literal(`\n" <> query <> "\n`);\n"
+  oPart =
+    if Object.isEmpty output then ""
+    else "export const o = z.array(z.object({ "
+      <> String.joinWith ",\n"
+        ( map
+            ( \(k /\ (OutputColumn v)) ->
+                "  " <> k <> " : " <> (if v.is_array then "z.array(" else "") <> toZodType v.type <> (if v.is_nullable then ".nullable()" else "") <> (if v.is_array then ")" else "")
+            )
+            (Object.toUnfoldable output)
+        )
+      <> "\n }));\n"
+  myIDef = if iIsEmpty then "" else "$i: z.infer<typeof i>"
+
+  secondPart
+    | oIsEmpty =
+        """
+export const run = (f: (s: string, v: any) => Promise<any>) => (""" <> myIDef <> """) => f(q._def.value, [""" <> myITerm <>
+          """]);
+"""
+    | otherwise =
+        """
+export const run = (f: (s: string, v: any) => Promise<any>) => (""" <> myIDef <> """) => f(q._def.value, [""" <> myITerm <>
+          """]).then(x => o.parse(x));
+"""
+
+codegenIoTs :: String -> PostgresQuerySchema -> String
+codegenIoTs query (PostgresQuerySchema { input: input, output: output }) = intercalate "\n"
+  [ firstPart
+  , if hasDate then """
 function isInstanceOf<T>(ctor: new (...args: any[]) => T) {
   return new t.Type<T, T, unknown>(
     'InstanceOf',
@@ -84,12 +226,9 @@ function isInstanceOf<T>(ctor: new (...args: any[]) => T) {
 
 const date = isInstanceOf(Date);
 
-"""
-        else ""
-      )
-    <>
-      ( if usesJson then
-          """
+""" else ""
+  , if hasJson then
+      """
 type JsonPrimative = string | number | boolean | null;
 type JsonArray = Json[];
 type JsonObject = { [key: string]: Json };
@@ -100,19 +239,62 @@ const json: t.Type<Json> = t.recursion('Json', () =>
   t.union([t.null, t.boolean, t.string, t.number, t.array(json), t.record(t.string, json)])
 )
 """
-        else ""
-      )
-    <>
-      ( String.replaceAll (String.Pattern "[Json") (String.Replacement "[json") $ String.replaceAll (String.Pattern "Json]") (String.Replacement "json]") $ String.replaceAll (String.Pattern "t.json") (String.Replacement "json")
-          $ String.replaceAll (String.Pattern "[Date") (String.Replacement "[date")
-          $ String.replaceAll (String.Pattern "Date]") (String.Replacement "date]")
-          $ String.replaceAll (String.Pattern "t.date") (String.Replacement "date") s
-      )
-    where
-    ioTsIsImported = isJust (String.indexOf (String.Pattern "from 'io-ts'") s) || isJust (String.indexOf (String.Pattern "from \"io-ts\"") s)
-    usesJson = isJust (String.indexOf (String.Pattern "json") s) || isJust (String.indexOf (String.Pattern "Json") s)
-    usesDate = isJust (String.indexOf (String.Pattern "date") s) || isJust (String.indexOf (String.Pattern "Date") s)
-  go Nothing s = s
+    else ""
+  , iPart
+  , qPart
+  , oPart
+  , secondPart
+  ]
+
+  where
+  iIsEmpty = Object.isEmpty input
+  hasJson = isJust $ Array.find (eq PGJson) (map (unwrap >>> _.type) (Object.values input) <> map (unwrap >>> _.type) (Object.values output))
+  hasDate = isJust $ Array.find (eq PGDate || eq PGTimestamp || eq PGTime || eq PGTimestampz || eq PGTimetz) (map (unwrap >>> _.type) (Object.values input) <> map (unwrap >>> _.type) (Object.values output))
+  columnNamesInOrder = map fst (Array.sortWith (snd >>> unwrap >>> _.position_starting_from_1) (Object.toUnfoldable input))
+  myITerm
+    | Array.length columnNamesInOrder == 0 = ""
+    | otherwise = String.joinWith ", "
+        $ map (\i -> "$i." <> i) columnNamesInOrder
+  oIsEmpty = Object.isEmpty output
+
+  firstPart = "import * as t from 'io-ts';\n"
+  iPart =
+    if Object.isEmpty input then ""
+    else "export const i = t.type({ "
+      <> String.joinWith ",\n"
+        ( map
+            ( \(k /\ (InputParameter v)) ->
+                "  " <> k <> " : " <> (if v.is_array then "t.array(" else "") <> ((if v.is_nullable then (\st -> "t.union([t.null,"<>st<>"])") else identity) $ toIoTsType v.type) <> (if v.is_array then ")" else "")
+            )
+            (Object.toUnfoldable input)
+        )
+      <> "\n });\n"
+  qPart = "export const q = t.literal(`\n" <> query <> "\n`);\n"
+  oPart =
+    if Object.isEmpty output then ""
+    else "export const o = t.array(t.type({ "
+      <> String.joinWith ",\n"
+        ( map
+            ( \(k /\ (OutputColumn v)) ->
+                "  " <> k <> " : " <> (if v.is_array then "t.array(" else "") <> ((if v.is_nullable then (\st -> "t.union([t.null,"<>st<>"])") else identity) $ toIoTsType v.type) <> (if v.is_array then ")" else "")
+            )
+            (Object.toUnfoldable output)
+        )
+      <> "\n }));\n"
+  myIDef = if iIsEmpty then "" else "$i: t.TypeOf<typeof i>"
+
+
+  secondPart
+    | oIsEmpty =
+        """
+export const run = (f: (s: string, v: any) => Promise<any>) => (""" <> myIDef <> """) => f(q.value, [""" <> myITerm <>
+          """]);
+"""
+    | otherwise =
+        """
+export const run = (f: (s: string, v: any) => Promise<any>) => (""" <> myIDef <> """) => f(q.value, [""" <> myITerm <>
+          """]).then(x => o.decode(x));
+"""
 
 startInstanceCmd :: String
 startInstanceCmd = "pg_tmp -t"
@@ -201,31 +383,34 @@ typescript info = do
           let rawQueryPath = Path.concat [ info.queries, "__raw", q ]
           log $ "Reading query from " <> rawQueryPath
           rawQueryText <- readTextFile Encoding.UTF8 rawQueryPath
-          let
-            systemM = case info.validator of
-              Just Zod -> DoZod.system
-              Just IoTs -> DoIoTs.system
-              Nothing -> DoTypescript.system
+          let systemM = DoBinding.system (DoBinding.Schema schema)
           let moduleName = pascalCase q
+          let userM = DoBinding.user (DoBinding.Query rawQueryText)
           let
-            userM = case info.validator of
-              Just Zod -> DoZod.user (DoZod.Schema schema) (DoZod.Query rawQueryText)
-              Just IoTs -> DoIoTs.user (DoIoTs.Schema schema) (DoIoTs.Query rawQueryText)
-              Nothing -> DoTypescript.user (DoTypescript.Schema schema) (DoTypescript.Query rawQueryText)
-          ChatCompletionResponse { choices } <- createCompletions info.url info.token
-            $ over ChatCompletionRequest
-                _
-                  { messages =
-                      [ message system systemM
-                      , message user userM
-                      ]
-                  }
-                ccr
-          { result, success } <- maybe (throwError $ error "No typescript could be generated") pure do
-            { message: { content } } <- choices !! 0
-            pure (convertToResult content)
+            getResult = do
+              ChatCompletionResponse { choices } <- createCompletions info.url info.token
+                $ over ChatCompletionRequest
+                    _
+                      { messages =
+                          [ message system systemM
+                          , message user userM
+                          ]
+                      }
+                    ccr
+              { result, success } <- maybe (throwError $ error "No PureScript could be generated") pure do
+                { message: { content } } <- choices !! 0
+                pure $ convertToResult content
+              if not success then pure $ CodegenResult { result: (PostgresQuerySchema { input: Object.empty, output: Object.empty }), success: false, orig: result }
+              else case readJSON result of
+                Right (PostgresQuerySchema json) -> pure $ CodegenResult { result: PostgresQuerySchema json, success: true, orig: result }
+                Left err -> do
+                  log $ "Could not parse result " <> result
+                  log $ "Error: " <> show err
+                  log "Attempting again"
+                  getResult
+          CodegenResult { result, success, orig } <- getResult
           if not success then do
-            log result
+            log orig
             pure $ Done unit
           else do
             log "Creating Typescript file"
@@ -248,10 +433,17 @@ typescript info = do
                 }
               Nothing -> throwError $ error "Could not read meta file"
             let newModulePath = Path.concat ([ info.ts ] <> [ moduleName <> ".ts" ])
-            writeTextFile Encoding.UTF8 newModulePath $ dehallucinate info.validator result
+            writeTextFile Encoding.UTF8 newModulePath $ case info.validator of
+              Just Zod -> codegenZod rawQueryText result
+              Just IoTs -> codegenIoTs rawQueryText result
+              Nothing -> codegenNoValidator rawQueryText result
             pure $ Loop $ Array.drop 1 queryArr
 
   queriesToRun <- generateQueriesToRun (Path.concat <<< ([ info.ts ] <> _) <<< pure <<< (_ <> ".ts") <<< pascalCase) _.typescript_binding info meta rawQ migrations queryPaths rawQPaths
   tailRecM go $ compact queriesToRun
   closeClient client
   liftEffect $ close console
+
+newtype CodegenResult = CodegenResult { result :: PostgresQuerySchema, success :: Boolean, orig :: String }
+
+derive newtype instance ReadForeign CodegenResult
