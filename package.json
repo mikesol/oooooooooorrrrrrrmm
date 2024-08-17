@@ -3,7 +3,7 @@
   "bin": {
     "oooooooooorrrrrrrmm": "./index.mjs"
   },
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "",
   "main": "index.mjs",
   "scripts": {
