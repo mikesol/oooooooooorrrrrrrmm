@@ -30,7 +30,7 @@ pnm i -D oooooooooorrrrrrrmm
 
 ## BYOCCA
 
-`oooooooooorrrrrrrmm` is Bring Your Own Chat Completions API. You can let orm know about it one of two ways:
+`oooooooooorrrrrrrmm` is Bring Your Own Chat Completions API. You can let `oooooooooorrrrrrrmm` know about it one of two ways:
 
 - Setting the `COMPLETIONS_URL` environment variable with the endpoint of your completions API. Also set `COMPLETIONS_TOKEN` if you have an API token.
 - Create an `oooooooooorrrrrrrmm.config.json` with keys `"url"` and optionally `"token"`.
