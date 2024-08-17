@@ -5,12 +5,14 @@ package:
     - argparse-basic
     - arrays
     - console
+    - control
     - effect
     - either
     - exceptions
     - filterable
     - foldable-traversable
     - foreign
+    - foreign-object
     - lists
     - maybe
     - newtype
