@@ -4,7 +4,7 @@ An ORM.
 
 ## Prerequisites
 
-1. Get an [OpenAI API key](https://help.openai.com/en/articles/4936850-where-do-i-find-my-openai-api-key). To avoid needing to specify the key for every request, check out the tips in [this guide](https://help.openai.com/en/articles/5112595-best-practices-for-api-key-safety).
+1. A [chat completions API](#byocca).
 
 2. Install `postgresql` via `apt` or `brew`.
 
@@ -27,6 +27,15 @@ or
 ```bash
 pnm i -D oooooooooorrrrrrrmm
 ```
+
+## BYOCCA
+
+`oooooooooorrrrrrrmm` is Bring Your Own Chat Completions API. You can let orm know about it one of two ways:
+
+- Setting the `COMPLETIONS_URL` environment variable with the endpoint of your completions API. Also set `COMPLETIONS_TOKEN` if you have an API token.
+- Create an `oooooooooorrrrrrrmm.config.json` with keys `"url"` and optionally `"token"`.
+
+One good candidate for a completions API is the OpenAPI endpoint: `https://api.openai.com/v1/chat/completions`.
 
 ## Usage
 

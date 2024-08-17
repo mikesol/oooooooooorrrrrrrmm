@@ -1,13 +1,4 @@
-module OOOOOOOOOORRRRRRRMM.Migrate
-  ( FixQueryResult(..)
-  , MigrationResult(..)
-  , checksum
-  , goQ
-  , migrate
-  , migrationsStartAt0AndIncreaseBy1
-  , pgDumpCmd
-  , startInstanceCmd
-  ) where
+module OOOOOOOOOORRRRRRRMM.Migrate where
 
 import Prelude
 
@@ -38,22 +29,15 @@ import Node.Path as Path
 import Node.ReadLine (close, createConsoleInterface, noCompletion)
 import Node.ReadLine.Aff (question)
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Migrate)
-import OOOOOOOOOORRRRRRRMM.OpenAI (ChatCompletionRequest(..), ChatCompletionResponse(..), ResponseFormat(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.Completions (ChatCompletionRequest(..), ChatCompletionResponse(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.ConvertToResult (convertToResult)
 import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), closeClient, newClient, parsePostgresUrl, runSqlCommand)
 import OOOOOOOOOORRRRRRRMM.Prompts.DoMigration as DoMigration
 import OOOOOOOOOORRRRRRRMM.Prompts.FixQuery (AdditionalContext(..))
 import OOOOOOOOOORRRRRRRMM.Prompts.FixQuery as FixQuery
 import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
 import OOOOOOOOOORRRRRRRMM.Schema (schema)
-import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
-
-newtype MigrationResult = MigrationResult { result :: String, success :: Boolean }
-
-derive newtype instance ReadForeign MigrationResult
-
-newtype FixQueryResult = FixQueryResult { result :: String, success :: Boolean, revised :: Boolean }
-
-derive newtype instance ReadForeign FixQueryResult
+import Yoga.JSON (readJSON_, writeJSON)
 
 startInstanceCmd :: String
 startInstanceCmd = "pg_tmp -t"
@@ -106,28 +90,25 @@ goQ migrationIx info schema migrationResult { todo, done } = Array.head todo # m
   context <-
     if contextExists then Just <<< AdditionalContext <$> readTextFile Encoding.UTF8 contextPath
     else pure Nothing
-  let systemM = FixQuery.system
-  let userM = FixQuery.user (FixQuery.Sql schema) (FixQuery.Migration migrationResult) (FixQuery.Intention intentionText) (FixQuery.Query queryText) context
-  ChatCompletionResponse { choices } <- createCompletions
+  let systemM = FixQuery.system (FixQuery.Sql schema) (FixQuery.Migration migrationResult)
+  let userM = FixQuery.user (FixQuery.Intention intentionText) (FixQuery.Query queryText) context
+  ChatCompletionResponse { choices } <- createCompletions info.url info.token
     $ over ChatCompletionRequest
         _
           { messages =
               [ message system systemM
               , message user userM
               ]
-          , response_format = pure $ ResponseFormat FixQuery.responseFormat
           }
         ccr
-  FixQueryResult { result, success, revised } <- maybe (throwError $ error "No fixed query could be generated") pure do
+  { result, success } <- maybe (throwError $ error "No fixed query could be generated") pure do
     { message: { content } } <- choices !! 0
-    content >>= readJSON_
+    pure (convertToResult content)
   if not success then do
     log result
-    when revised do
-      log $ "You can add context to the query by creating a file with free-form text at " <> contextPath <> " and run the migration again."
+    log $ "You can add context to the query by creating a file with free-form text at " <> contextPath <> " and run the migration again."
     pure $ Done $ Left unit
   else do
-    log $ "The query " <> queryPath <> " was " <> if not revised then "not in need of revision." else "revised."
     let
       writeWithoutMerge = writeTextFile Encoding.UTF8 metaPath $ writeJSON
         $ Metadata
@@ -211,27 +192,26 @@ migrate info = do
         Just migrationIx -> do
           let migrationPath = Path.concat [ info.migrations, show migrationIx ]
           migrationText <- readTextFile Encoding.UTF8 migrationPath
-          let systemM = DoMigration.system
-          let userM = DoMigration.user (DoMigration.Sql schema) (DoMigration.Ask migrationText)
+          let systemM = DoMigration.system (DoMigration.Sql schema) 
+          let userM = DoMigration.user (DoMigration.Ask migrationText)
           let isRaw = String.take 6 migrationText == "--raw\n"
           let
             cc retries = do
-              MigrationResult { result, success } <-
-                if isRaw then pure $ MigrationResult { result: migrationText, success: true }
+              { result, success } <-
+                if isRaw then pure { result: migrationText, success: true }
                 else do
-                  ChatCompletionResponse { choices } <- createCompletions
+                  ChatCompletionResponse { choices } <- createCompletions info.url info.token
                     $ over ChatCompletionRequest
                         _
                           { messages =
                               [ message system systemM
                               , message user userM
                               ]
-                          , response_format = pure $ ResponseFormat DoMigration.responseFormat
                           }
                         ccr
                   maybe (throwError $ error "No migration could be generated") pure do
                     { message: { content } } <- choices !! 0
-                    content >>= readJSON_
+                    pure (convertToResult content)
               if not success then do
                 log result
                 pure $ Done unit
@@ -240,21 +220,21 @@ migrate info = do
                   qtext =
                     """Please review the migration text inside the <migration> tag below.
 <migration>
-              """
+"""
                       <> result
                       <>
                         """
 </migration>
-Press n or N to reject and any other key to continue: """
+Press y or Y to accept and any other key to reject: """
 
                 response <- if info.yes then pure "y" else question qtext console
                 case response of
                   x
-                    | x == "n" || x == "N" -> do
+                    | x /= "y" && x /= "Y" -> do
                         log "Oh noes! Please change your prompt and try again."
                         pure $ Done unit
                     | otherwise -> do
-                        log $ if info.yes then "Creating migration 📄\n<migration>\n" <> result <> "\n</migration>\n" else "Great! Creating migration 📄"
+                        log $ if info.yes then "Creating migration "<>writeJSON migrationIx<>" 📄\n<migration>\n" <> result <> "\n</migration>\n" else "Great! Creating migration 📄"
                         cmd <- try $ runSqlCommand client result mempty
                         case cmd of
                           Left _ -> do
@@ -310,6 +290,8 @@ Press n or N to reject and any other key to continue: """
     { humanReadable: true
     , migrations: info.migrations
     , path: Path.concat [ info.schema, "schema.sql" ]
+    , url: info.url
+    , token: info.token
     }
 
 foreign import checksum :: String -> String

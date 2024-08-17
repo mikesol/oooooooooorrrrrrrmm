@@ -11,3 +11,13 @@ generated-docs/
 .psa*
 .spago
 index.mjs
+# for local development
+migrations/
+# for local development
+queries/
+# for local development
+context/
+# for local development
+schema/
+# for local development
+oooooooooorrrrrrrmm.config.json

@@ -3,13 +3,18 @@ module Main where
 import Prelude
 
 import ArgParse.Basic (parseArgs, printArgError)
+import Control.Alt ((<|>))
 import Data.Array as Array
 import Data.Either (Either(..))
+import Data.Maybe (Maybe(..))
 import Effect (Effect)
 import Effect.Aff (launchAff_)
 import Effect.Class.Console (log)
-import Node.Process (argv)
-import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Arrrrrgs(..), parser)
+import Foreign.Object (Object, lookup)
+import Node.Encoding (Encoding(..))
+import Node.FS.Sync (exists, readTextFile)
+import Node.Process (argv, getEnv)
+import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Arrrrrgs(..), RCFile(..), parser)
 import OOOOOOOOOORRRRRRRMM.Bootstrap (bootstrap)
 import OOOOOOOOOORRRRRRRMM.BootstrapTmp (bootstrapTmp)
 import OOOOOOOOOORRRRRRRMM.Migrate (migrate)
@@ -19,11 +24,29 @@ import OOOOOOOOOORRRRRRRMM.Query (query)
 import OOOOOOOOOORRRRRRRMM.Question (question)
 import OOOOOOOOOORRRRRRRMM.Schema (schema)
 import OOOOOOOOOORRRRRRRMM.TypeScript (typescript)
+import Yoga.JSON (readJSON_)
+
+configFile = "oooooooooorrrrrrrmm.config.json" :: String
+
+chooseEnv :: Object String -> RCFile -> RCFile
+chooseEnv env (RCFile { token, url }) = RCFile
+  { token: lookup "COMPLETIONS_TOKEN" env <|> token
+  , url: lookup "COMPLETIONS_URL" env <|> url
+  }
 
 main :: Effect Unit
 main = do
+  rcExists <- exists configFile
+  rc <- chooseEnv <$> getEnv <*>
+    if not rcExists then pure mempty
+    else do
+      log $ "Found " <> configFile <> ". Running commands from it."
+      rc <- readJSON_ <$> readTextFile UTF8 configFile
+      case rc of
+        Nothing -> pure $ mempty
+        Just (RCFile rc') -> pure $ RCFile rc'
   args <- argv
-  case parseArgs "my-cli" "This is my CLI." parser (Array.drop 2 args) of
+  case parseArgs "my-cli" "This is my CLI." (parser rc) (Array.drop 2 args) of
     Left err -> log $ printArgError err
     Right success -> case success of
       Migrate m -> launchAff_ do migrate m

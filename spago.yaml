@@ -5,13 +5,14 @@ package:
     - argparse-basic
     - arrays
     - console
+    - control
     - effect
     - either
     - exceptions
     - filterable
     - foldable-traversable
     - foreign
-    - lists
+    - foreign-object
     - maybe
     - newtype
     - node-buffer
@@ -29,6 +30,7 @@ package:
     - transformers
     - tuples
     - unicode
+    - yoga-fetch
     - yoga-json
   test:
     main: Test.Main

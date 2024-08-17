@@ -28,7 +28,8 @@ import Node.ReadLine (close, createConsoleInterface, noCompletion)
 import Node.ReadLine.Aff (question)
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (Query)
 import OOOOOOOOOORRRRRRRMM.Checksum (checksum)
-import OOOOOOOOOORRRRRRRMM.OpenAI (ChatCompletionRequest(..), ChatCompletionResponse(..), ResponseFormat(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.Completions (ChatCompletionRequest(..), ChatCompletionResponse(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.ConvertToResult (convertToResult)
 import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), closeClient, newClient, parsePostgresUrl, runSqlCommand)
 import OOOOOOOOOORRRRRRRMM.Prompts.DoQuery as DoQuery
 import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
@@ -122,21 +123,20 @@ query info = do
           let queryPath = Path.concat [ info.queries, q ]
           log $ "Reading query from " <> queryPath
           queryText <- readTextFile Encoding.UTF8 queryPath
-          let systemM = DoQuery.system
-          let userM = DoQuery.user (DoQuery.Sql schema) (DoQuery.Ask queryText)
-          ChatCompletionResponse { choices } <- createCompletions
+          let systemM = DoQuery.system (DoQuery.Sql schema)
+          let userM = DoQuery.user (DoQuery.Ask queryText)
+          ChatCompletionResponse { choices } <- createCompletions info.url info.token
             $ over ChatCompletionRequest
                 _
                   { messages =
                       [ message system systemM
                       , message user userM
                       ]
-                  , response_format = pure $ ResponseFormat DoQuery.responseFormat
                   }
                 ccr
-          QueryResult { result, success } <- maybe (throwError $ error "No query could be generated") pure do
+          { result, success } <- maybe (throwError $ error "No query could be generated") pure do
             { message: { content } } <- choices !! 0
-            content >>= readJSON_
+            pure (convertToResult content)
           if not success then do
             log result
             pure $ Done unit
@@ -151,12 +151,12 @@ query info = do
                   <>
                     """
 </query>
-Press n or N to reject and any other key to continue: """
+Press y or Y to accept and any other key to reject: """
 
             response <- if info.yes then pure "y" else question qtext console
             case response of
               x
-                | x == "n" || x == "N" -> do
+                | x /= "y" && x /= "Y" -> do
                     log "Oh noes! Please change your prompt and try again."
                     pure $ Done unit
                 | otherwise -> do

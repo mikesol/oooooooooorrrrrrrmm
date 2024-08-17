@@ -3,9 +3,18 @@ module OOOOOOOOOORRRRRRRMM.Arrrrrgs where
 import Prelude
 
 import ArgParse.Basic (ArgParser, argument, boolean, choose, command, default, flag, flagHelp, fromRecord, int, optional)
+import Control.Alt ((<|>))
 import Data.Generic.Rep (class Generic)
-import Data.Maybe (Maybe(..))
+import Data.Maybe (Maybe(..), fromMaybe)
+import Data.Newtype (class Newtype, un)
 import Data.Show.Generic (genericShow)
+import Yoga.JSON (class ReadForeign)
+
+newtype RCFile = RCFile { url :: Maybe String, token :: Maybe String }
+derive instance Newtype RCFile _
+derive newtype instance ReadForeign RCFile
+derive newtype instance Semigroup RCFile
+derive newtype instance Monoid RCFile
 
 data Validator = Zod | IoTs
 
@@ -21,6 +30,8 @@ type Migrate =
   , schema :: String
   , yes :: Boolean
   , tries :: Int
+  , url :: String
+  , token :: Maybe String
   }
 
 type PreCommit =
@@ -32,6 +43,8 @@ type Query =
   { queries :: String
   , migrations :: String
   , yes :: Boolean
+  , url :: String
+  , token :: Maybe String
   }
 
 type PureScript =
@@ -39,6 +52,8 @@ type PureScript =
   , migrations :: String
   , ps :: String
   , prefix :: String
+  , url :: String
+  , token :: Maybe String
   }
 
 type Typescript =
@@ -46,10 +61,25 @@ type Typescript =
   , migrations :: String
   , ts :: String
   , validator :: Maybe Validator
+  , url :: String
+  , token :: Maybe String
   }
 
-type Schema = { migrations :: String, path :: String, humanReadable :: Boolean }
-type Question = { migrations :: String, question :: String }
+type Schema =
+  { migrations :: String
+  , path :: String
+  , humanReadable :: Boolean
+  , url :: String
+  , token :: Maybe String
+  }
+
+type Question =
+  { migrations :: String
+  , question :: String
+  , url :: String
+  , token :: Maybe String
+  }
+
 type BootstrapTmp = { args :: String, migrations :: String }
 type Bootstrap = { connectionString :: String, migrations :: String, startingMigration :: Int }
 
@@ -69,8 +99,8 @@ derive instance Generic Arrrrrgs _
 instance Show Arrrrrgs where
   show = genericShow
 
-migrate ∷ ArgParser Migrate
-migrate = command [ "migrate", "m" ] "Create migrations." do
+migrate ∷ RCFile -> ArgParser Migrate
+migrate rc = command [ "migrate", "m" ] "Create migrations." do
   flagHelp *> fromRecord
     { migrations:
         argument
@@ -96,6 +126,17 @@ migrate = command [ "migrate", "m" ] "Create migrations." do
         flag
           [ "--yes", "-y" ]
           "Bypasses review and just writes the migration." # boolean
+    , url:
+        argument
+          [ "--url", "-u" ]
+          "The url to run the query against."
+          # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , token:
+        argument
+          [ "--token", "-t" ]
+          "The bearer token for authentication"
+          # optional
+          <#> (_ <|> (un RCFile rc).token)
     , tries:
         argument
           [ "--tries", "-t" ]
@@ -117,8 +158,8 @@ preCommit = command [ "pre-commit", "pc" ] "A pre-commit hook" do
           # default "queries"
     }
 
-query ∷ ArgParser Query
-query = command [ "query", "q" ] "Create queries." do
+query ∷ RCFile -> ArgParser Query
+query rc = command [ "query", "q" ] "Create queries." do
   flagHelp *> fromRecord
     { queries:
         argument
@@ -130,14 +171,25 @@ query = command [ "query", "q" ] "Create queries." do
           [ "--migrations", "-m" ]
           "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
           # default "migrations"
+    , url:
+        argument
+          [ "--url", "-u" ]
+          "The url to run the query against."
+          # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , token:
+        argument
+          [ "--token", "-t" ]
+          "The bearer token for authentication"
+          # optional
+          <#> (_ <|> (un RCFile rc).token)
     , yes:
         flag
           [ "--yes", "-y" ]
           "Bypasses review and just writes the query." # boolean
     }
 
-pureScript ∷ ArgParser PureScript
-pureScript = command [ "purescript", "ps" ] "Create purescript bindings." do
+pureScript ∷ RCFile -> ArgParser PureScript
+pureScript rc = command [ "purescript", "ps" ] "Create purescript bindings." do
   flagHelp *> fromRecord
     { queries:
         argument
@@ -149,6 +201,17 @@ pureScript = command [ "purescript", "ps" ] "Create purescript bindings." do
           [ "--migrations", "-m" ]
           "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
           # default "migrations"
+    , url:
+        argument
+          [ "--url", "-u" ]
+          "The url to run the query against."
+          # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , token:
+        argument
+          [ "--token", "-t" ]
+          "The bearer token for authentication"
+          # optional
+          <#> (_ <|> (un RCFile rc).token)
     , prefix:
         argument
           [ "--prefix", "-x" ]
@@ -161,8 +224,8 @@ pureScript = command [ "purescript", "ps" ] "Create purescript bindings." do
           # default "src"
     }
 
-typescript ∷ ArgParser Typescript
-typescript = command [ "typescript", "ts" ] "Create typescript bindings." do
+typescript ∷ RCFile -> ArgParser Typescript
+typescript rc = command [ "typescript", "ts" ] "Create typescript bindings." do
   flagHelp *> fromRecord
     { queries:
         argument
@@ -174,6 +237,16 @@ typescript = command [ "typescript", "ts" ] "Create typescript bindings." do
           [ "--migrations", "-m" ]
           "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
           # default "migrations"
+    , url:
+        argument
+          [ "--url", "-u" ]
+          "The url to run the query against."
+          # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , token:
+        argument
+          [ "--token", "-t" ]
+          "The bearer token for authentication"
+          # optional <#> (_ <|> (un RCFile rc).token)
     , ts:
         argument
           [ "--path", "-p" ]
@@ -191,8 +264,8 @@ typescript = command [ "typescript", "ts" ] "Create typescript bindings." do
 
     }
 
-schema ∷ ArgParser Schema
-schema = command [ "schema", "s" ] "Export the schema." do
+schema ∷ RCFile -> ArgParser Schema
+schema rc = command [ "schema", "s" ] "Export the schema." do
   flagHelp *> fromRecord
     { path:
         argument
@@ -209,10 +282,21 @@ schema = command [ "schema", "s" ] "Export the schema." do
           [ "--legible", "-l" ]
           "Make the schema human readable, getting rid of Postgres gunk."
           # boolean
+    , url:
+        argument
+          [ "--url", "-u" ]
+          "The url to run the query against."
+          # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , token:
+        argument
+          [ "--token", "-t" ]
+          "The bearer token for authentication"
+          # optional
+          <#> (_ <|> (un RCFile rc).token)
     }
 
-question ∷ ArgParser Question
-question = command [ "ask", "a" ] "Ask a question." do
+question ∷ RCFile -> ArgParser Question
+question rc = command [ "ask", "a" ] "Ask a question." do
   flagHelp *> fromRecord
     { question:
         argument
@@ -223,6 +307,17 @@ question = command [ "ask", "a" ] "Ask a question." do
           [ "--migrations", "-m" ]
           "The directory with the migrations. Must be sequential, starting from 0. The first one without a corresponding record in the db will be run."
           # default "migrations"
+    , url:
+        argument
+          [ "--url", "-u" ]
+          "The url to run the query against."
+          # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , token:
+        argument
+          [ "--token", "-t" ]
+          "The bearer token for authentication"
+          # optional
+          <#> (_ <|> (un RCFile rc).token)
     }
 
 bootstrapTmp ∷ ArgParser BootstrapTmp
@@ -256,15 +351,15 @@ bootstrap = command [ "bootstrap", "b" ] "Bootstraps a db with your migrations."
           "The migration to start from" # int # default 0
     }
 
-parser :: ArgParser Arrrrrgs
-parser = choose
+parser :: RCFile -> ArgParser Arrrrrgs
+parser rc = choose
   "command"
-  [ Migrate <$> migrate
-  , Query <$> query
-  , PureScript <$> pureScript
-  , Typescript <$> typescript
-  , Schema <$> schema
-  , Question <$> question
+  [ Migrate <$> migrate rc
+  , Query <$> query rc
+  , PureScript <$> pureScript rc
+  , Typescript <$> typescript rc
+  , Schema <$> schema rc
+  , Question <$> question rc
   , BootstrapTmp <$> bootstrapTmp
   , Bootstrap <$> bootstrap
   , PreCommit <$> preCommit

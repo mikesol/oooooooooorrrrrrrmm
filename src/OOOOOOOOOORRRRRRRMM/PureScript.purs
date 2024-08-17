@@ -8,19 +8,21 @@ import Data.Array as Array
 import Data.CodePoint.Unicode (isAlphaNum, isUpper)
 import Data.Either (Either(..))
 import Data.Filterable (compact, filter, filterMap)
-import Data.Foldable (for_)
-import Data.List as List
+import Data.Foldable (for_, intercalate)
 import Data.Maybe (Maybe(..), isJust, maybe)
 import Data.Monoid.Conj (Conj(..))
-import Data.Newtype (over)
+import Data.Newtype (over, unwrap)
 import Data.String (codePointFromChar)
 import Data.String as String
 import Data.String.CodeUnits (toCharArray)
 import Data.String.Extra (kebabCase, pascalCase)
+import Data.Tuple (fst, snd)
+import Data.Tuple.Nested ((/\))
 import Effect.Aff (Aff, error, makeAff, throwError)
 import Effect.Class (liftEffect)
 import Effect.Class.Console (log)
 import Effect.Random (randomInt)
+import Foreign.Object as Object
 import Node.Buffer (toString)
 import Node.ChildProcess (exec')
 import Node.Encoding (Encoding(..))
@@ -33,55 +35,93 @@ import Node.Path as Path
 import Node.ReadLine (close, createConsoleInterface, noCompletion)
 import OOOOOOOOOORRRRRRRMM.Arrrrrgs (PureScript)
 import OOOOOOOOOORRRRRRRMM.Checksum (checksum)
-import OOOOOOOOOORRRRRRRMM.OpenAI (ChatCompletionRequest(..), ChatCompletionResponse(..), ResponseFormat(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.Completions (ChatCompletionRequest(..), ChatCompletionResponse(..), ccr, createCompletions, message, system, user)
+import OOOOOOOOOORRRRRRRMM.ConvertToResult (convertToResult)
+import OOOOOOOOOORRRRRRRMM.PGInfo (InputParameter(..), OutputColumn(..), PostgresQuerySchema(..), PostgresType(..))
 import OOOOOOOOOORRRRRRRMM.Pg (Database(..), Host(..), Port(..), User(..), closeClient, newClient, parsePostgresUrl, runSqlCommand)
-import OOOOOOOOOORRRRRRRMM.Prompts.DoPurescript as DoPurescript
+import OOOOOOOOOORRRRRRRMM.Prompts.DoBinding as DoBinding
 import OOOOOOOOOORRRRRRRMM.QueriesToRun (generateQueriesToRun)
 import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
 import Safe.Coerce (coerce)
-import Yoga.JSON (class ReadForeign, readJSON_, writeJSON)
+import Yoga.JSON (class ReadForeign, readJSON, readJSON_, writeJSON)
 
-dehallucinate :: DoPurescript.ModuleName -> String -> String
-dehallucinate (DoPurescript.ModuleName moduleName) s = firstPart <> secondPart
+removeLLMGeneratedImports :: String -> String
+removeLLMGeneratedImports s = String.joinWith "\n" withoutImports
+  where
+  split = String.split (String.Pattern "\n") s
+  withoutImports = Array.filter (notEq "import " <<< String.take 7) split
+
+toPsType :: PostgresType -> String
+toPsType = case _ of
+  PGInteger -> "Int"
+  PGBoolean -> "Boolean"
+  PGTimestamp -> "JSDate"
+  PGTimestampz -> "JSDate"
+  PGJson -> "Foreign"
+  PGText -> "String"
+  PGVarchar -> "String"
+  PGNumeric -> "Number"
+  PGUuid -> "String"
+  PGBytea -> "String"
+  PGDate -> "JSDate"
+  PGTime -> "JSDate"
+  PGTimetz -> "JSDate"
+  PGInterval -> "String"
+  PGRecord -> "Foreign"
+  PGEnum -> "String"
+  PGTsvector -> "String"
+  PGTsquery -> "String"
+
+codegen :: String -> String -> PostgresQuerySchema -> String
+codegen moduleName query (PostgresQuerySchema { input: input, output: output }) = intercalate "\n" [ firstPart, iPart, qPart, oPart, secondPart ]
 
   where
-  iIsEmpty = isJust $ String.indexOf (String.Pattern "type I = {}") s
-  input = if iIsEmpty then "" else " I ->"
+  iIsEmpty = Object.isEmpty input
+  inputType = if iIsEmpty then "" else " I ->"
   inputVar = if iIsEmpty then "" else " i "
-  columnNamesInOrder = maybe [] Array.fromFoldable do
-    afterI <- String.split (String.Pattern "type I") s !! 1
-    iType <- String.split (String.Pattern "type Q") afterI !! 0
-    let
-      go a _ (List.Cons "::" b) = List.Cons a $ go "" List.Nil b
-      go _ l (List.Cons x b) = go x l b
-      go _ l List.Nil = l
-    pure $ go "" List.Nil $ filter (_ /= "") $ List.fromFoldable $ String.split (String.Pattern " ") iType
-
+  columnNamesInOrder = map fst (Array.sortWith (snd >>> unwrap >>> _.position_starting_from_1) (Object.toUnfoldable input))
   inputImpl
     | Array.length columnNamesInOrder == 0 = ""
     | otherwise = String.joinWith ", "
         $ map (\i -> "writeImpl i." <> i) columnNamesInOrder
-  oIsEmpty = isJust $ String.indexOf (String.Pattern "type O = {}") s
-  hasDate = isJust (String.indexOf (String.Pattern "JSDate") s) || isJust (String.indexOf (String.Pattern "Date") s)
-  hasMaybe = isJust $ String.indexOf (String.Pattern "Maybe") s
+  oIsEmpty = Object.isEmpty output
+  hasDate = isJust $ Array.find (eq PGDate || eq PGTimestamp || eq PGTime || eq PGTimestampz || eq PGTimetz) (map (unwrap >>> _.type) (Object.values input) <> map (unwrap >>> _.type) (Object.values output))
+  hasMaybe = Array.elem true (map (unwrap >>> _.is_nullable) (Object.values input) <> map (unwrap >>> _.is_nullable) (Object.values output))
   jsonImport = if oIsEmpty then "import Yoga.JSON (writeImpl)\n" else "import Yoga.JSON (writeImpl, E, read)\n"
   dateImport = if hasDate then "import Data.JSDate (JSDate)\n" else ""
   maybeImport = if hasMaybe then "import Data.Maybe (Maybe)\n" else ""
 
-  firstPart = String.replaceAll (String.Pattern (moduleName <> " where")) (String.Replacement (moduleName <> " where\n\nimport Prelude\nimport Effect.Aff (Aff)\nimport Data.Symbol (reflectSymbol)\nimport Type.Proxy (Proxy(..))\nimport Foreign (Foreign)\n" <> jsonImport <> dateImport <> maybeImport))
-    $ String.replaceAll (String.Pattern "<purescript>") (String.Replacement "")
-    -- corrective for Date if it messes that up
-    $ String.replaceAll (String.Pattern "JSJSDate") (String.Replacement "JSDate")
-    $ String.replaceAll (String.Pattern "Date") (String.Replacement "JSDate")
-    $ String.replaceAll (String.Pattern "</purescript>") (String.Replacement "")
-    $ String.replaceAll (String.Pattern "```") (String.Replacement "")
-    $ String.replaceAll (String.Pattern "```purescript") (String.Replacement "")
-    $ String.replaceAll (String.Pattern "type I = {}") (String.Replacement "")
-    $ String.replaceAll (String.Pattern "type O = {}") (String.Replacement "") s
+  firstPart = "module " <> moduleName <> " where\n\nimport Prelude\nimport Effect.Aff (Aff)\nimport Data.Symbol (reflectSymbol)\nimport Type.Proxy (Proxy(..))\nimport Foreign (Foreign)\n"
+    <> jsonImport
+    <> dateImport
+    <> maybeImport
+  iPart =
+    if Object.isEmpty input then ""
+    else "type I = { "
+      <> String.joinWith ",\n"
+        ( map
+            ( \(k /\ (InputParameter v)) -> let needsParens = v.is_nullable && v.is_array in
+                "  " <> k <> " :: " <> (if v.is_array then "Array " else "") <> (if needsParens then "(" else "") <> (if v.is_nullable then "Maybe " else "") <> toPsType v.type <> (if needsParens then ")" else "")
+            )
+            (Object.toUnfoldable input)
+        )
+      <> "\n }\n"
+  qPart = "type Q = \"\"\"\n" <> query <> "\n\"\"\"\n"
+  oPart =
+    if Object.isEmpty output then ""
+    else "type O = Array { "
+      <> String.joinWith ",\n"
+        ( map
+            ( \(k /\ (OutputColumn v)) -> let needsParens = v.is_nullable && v.is_array in
+                "  " <> k <> " :: " <> (if v.is_array then "Array " else "") <> (if needsParens then "(" else "") <> (if v.is_nullable then "Maybe " else "") <> toPsType v.type <> (if needsParens then ")" else "")
+            )
+            (Object.toUnfoldable output)
+        )
+      <> "\n }\n"
   secondPart
     | oIsEmpty =
         """
-run :: (String -> Foreign -> Aff Foreign) ->""" <> input
+run :: (String -> Foreign -> Aff Foreign) ->""" <> inputType
           <>
             """ Aff Unit
 run go """
@@ -95,7 +135,7 @@ run go """
 """
     | otherwise =
         """
-run :: (String -> Foreign -> Aff Foreign) ->""" <> input
+run :: (String -> Foreign -> Aff Foreign) ->""" <> inputType
           <>
             """ Aff (E O)
 run go """
@@ -109,9 +149,9 @@ run go """
   pure $ read o
 """
 
-newtype QueryResult = QueryResult { result :: String, success :: Boolean }
+newtype CodegenResult = CodegenResult { result :: PostgresQuerySchema, success :: Boolean, orig :: String }
 
-derive newtype instance ReadForeign QueryResult
+derive newtype instance ReadForeign CodegenResult
 
 startInstanceCmd :: String
 startInstanceCmd = "pg_tmp -t"
@@ -219,25 +259,33 @@ pureScript info = do
           let rawQueryPath = Path.concat [ info.queries, "__raw", q ]
           log $ "Reading query from " <> rawQueryPath
           rawQueryText <- readTextFile Encoding.UTF8 rawQueryPath
-          let systemM = DoPurescript.system
+          let systemM = DoBinding.system (DoBinding.Schema schema) 
           let moduleFileName = pascalCase q
           let moduleName = info.prefix <> "." <> pascalCase q
-          let userM = DoPurescript.user (DoPurescript.Schema schema) (DoPurescript.Query rawQueryText) (DoPurescript.ModuleName moduleName)
-          ChatCompletionResponse { choices } <- createCompletions
-            $ over ChatCompletionRequest
-                _
-                  { messages =
-                      [ message system systemM
-                      , message user userM
-                      ]
-                  , response_format = pure $ ResponseFormat DoPurescript.responseFormat
-                  }
-                ccr
-          QueryResult { result, success } <- maybe (throwError $ error "No PureScript could be generated") pure do
-            { message: { content } } <- choices !! 0
-            content >>= readJSON_
+          let userM = DoBinding.user (DoBinding.Query rawQueryText)
+          let
+            getResult = do
+              ChatCompletionResponse { choices } <- createCompletions info.url info.token
+                $ over ChatCompletionRequest
+                    _
+                      { messages =
+                          [ message system systemM
+                          , message user userM
+                          ]
+                      }
+                    ccr
+              { result, success } <- maybe (throwError $ error "No PureScript could be generated") pure do
+                { message: { content } } <- choices !! 0
+                pure $ convertToResult content
+              if not success then pure $ CodegenResult { result: (PostgresQuerySchema { input: Object.empty, output: Object.empty }), success: false, orig: result }
+              else case readJSON result of
+                Right (PostgresQuerySchema json) -> pure $ CodegenResult { result: PostgresQuerySchema json, success: true, orig: result }
+                Left err -> do
+                  log $ "Could not parse query, attempting again" <> show err
+                  getResult
+          CodegenResult { result, success, orig } <- getResult
           if not success then do
-            log result
+            log orig
             pure $ Done unit
           else do
             log "Creating PureScript file"
@@ -260,7 +308,7 @@ pureScript info = do
                 , most_recent_migration_checksum
                 }
               Nothing -> throwError $ error "Could not read meta file"
-            writeTextFile Encoding.UTF8 newModulePath $ dehallucinate (DoPurescript.ModuleName moduleName) result
+            writeTextFile Encoding.UTF8 newModulePath $ codegen moduleName rawQueryText result
             pure $ Loop $ Array.drop 1 queryArr
 
   queriesToRun <- generateQueriesToRun (Path.concat <<< (([ info.ps ] <> splitPrefix) <> _) <<< pure <<< (_ <> ".purs") <<< pascalCase) _.purescript_binding info meta rawQ migrations queryPaths rawQPaths
