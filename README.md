@@ -211,3 +211,9 @@ It validates several things:
 - all language bindings correspond to the most recent migrations and queries
 
 If any of these are not the case, the hook will fail.
+
+## Migrating from another ORM
+
+The cleanest way to migrate from another ORM is to use `pg_dump` to get your current schema and create a `0` migration with the contents of the db dump, adding `--raw` as a single-line comment at the beginning.
+
+Then, for each query in your app, you can paste the old ORM code as a reference and it will generate the correct query.
