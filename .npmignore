@@ -12,3 +12,7 @@ generated-docs/
 .spago
 src/
 test/
+oooooooooorrrrrrrmm.config.json
+migrations/
+schema/
+queries/
