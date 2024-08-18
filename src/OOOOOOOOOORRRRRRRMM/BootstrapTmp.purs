@@ -32,7 +32,7 @@ startInstanceCmd = append "pg_tmp "
 
 pgDumpCmd :: Database -> Host -> Port -> User -> FilePath -> String
 pgDumpCmd (Database database) (Host host) (Port port) (User user) fp =
-  "pg_dump -d "
+  "pg_dump --schema-only -d "
     <> database
     <> " -h "
     <> host
