@@ -142,7 +142,7 @@ migrate rc = command [ "migrate", "m" ] "Create migrations." do
         argument
           [ "--model", "-ml" ]
           "The model to use."
-          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
+          # default (fromMaybe "gpt-4o" (un RCFile rc).model)
     , token:
         argument
           [ "--token", "-t" ]
@@ -192,7 +192,7 @@ query rc = command [ "query", "q" ] "Create queries." do
         argument
           [ "--model", "-ml" ]
           "The model to use."
-          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
+          # default (fromMaybe "gpt-4o" (un RCFile rc).model)
     , token:
         argument
           [ "--token", "-t" ]
@@ -227,7 +227,7 @@ pureScript rc = command [ "purescript", "ps" ] "Create purescript bindings." do
         argument
           [ "--model", "-ml" ]
           "The model to use."
-          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
+          # default (fromMaybe "gpt-4o" (un RCFile rc).model)
     , token:
         argument
           [ "--token", "-t" ]
@@ -268,7 +268,7 @@ typescript rc = command [ "typescript", "ts" ] "Create typescript bindings." do
         argument
           [ "--model", "-ml" ]
           "The model to use."
-          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
+          # default (fromMaybe "gpt-4o" (un RCFile rc).model)
     , token:
         argument
           [ "--token", "-t" ]
@@ -319,7 +319,7 @@ schema rc = command [ "schema", "s" ] "Export the schema." do
         argument
           [ "--model", "-ml" ]
           "The model to use."
-          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
+          # default (fromMaybe "gpt-4o" (un RCFile rc).model)
     , token:
         argument
           [ "--token", "-t" ]
@@ -349,7 +349,7 @@ question rc = command [ "ask", "a" ] "Ask a question." do
         argument
           [ "--model", "-ml" ]
           "The model to use."
-          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
+          # default (fromMaybe "gpt-4o" (un RCFile rc).model)
     , token:
         argument
           [ "--token", "-t" ]
