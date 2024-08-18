@@ -59,6 +59,7 @@ toNonValidatedType = case _ of
   PGEnum -> "string"
   PGTsvector -> "string"
   PGTsquery -> "string"
+
 toIoTsType :: PostgresType -> String
 toIoTsType = case _ of
   PGBoolean -> "t.boolean"
@@ -214,7 +215,8 @@ export const run = (f: (s: string, v: any) => Promise<any>) => (""" <> myIDef <>
 codegenIoTs :: String -> PostgresQuerySchema -> String
 codegenIoTs query (PostgresQuerySchema { input: input, output: output }) = intercalate "\n"
   [ firstPart
-  , if hasDate then """
+  , if hasDate then
+      """
 function isInstanceOf<T>(ctor: new (...args: any[]) => T) {
   return new t.Type<T, T, unknown>(
     'InstanceOf',
@@ -226,7 +228,8 @@ function isInstanceOf<T>(ctor: new (...args: any[]) => T) {
 
 const date = isInstanceOf(Date);
 
-""" else ""
+"""
+    else ""
   , if hasJson then
       """
 type JsonPrimative = string | number | boolean | null;
@@ -264,7 +267,7 @@ const json: t.Type<Json> = t.recursion('Json', () =>
       <> String.joinWith ",\n"
         ( map
             ( \(k /\ (InputParameter v)) ->
-                "  " <> k <> " : " <> (if v.is_array then "t.array(" else "") <> ((if v.is_nullable then (\st -> "t.union([t.null,"<>st<>"])") else identity) $ toIoTsType v.type) <> (if v.is_array then ")" else "")
+                "  " <> k <> " : " <> (if v.is_array then "t.array(" else "") <> ((if v.is_nullable then (\st -> "t.union([t.null," <> st <> "])") else identity) $ toIoTsType v.type) <> (if v.is_array then ")" else "")
             )
             (Object.toUnfoldable input)
         )
@@ -276,13 +279,12 @@ const json: t.Type<Json> = t.recursion('Json', () =>
       <> String.joinWith ",\n"
         ( map
             ( \(k /\ (OutputColumn v)) ->
-                "  " <> k <> " : " <> (if v.is_array then "t.array(" else "") <> ((if v.is_nullable then (\st -> "t.union([t.null,"<>st<>"])") else identity) $ toIoTsType v.type) <> (if v.is_array then ")" else "")
+                "  " <> k <> " : " <> (if v.is_array then "t.array(" else "") <> ((if v.is_nullable then (\st -> "t.union([t.null," <> st <> "])") else identity) $ toIoTsType v.type) <> (if v.is_array then ")" else "")
             )
             (Object.toUnfoldable output)
         )
       <> "\n }));\n"
   myIDef = if iIsEmpty then "" else "$i: t.TypeOf<typeof i>"
-
 
   secondPart
     | oIsEmpty =
@@ -391,7 +393,8 @@ typescript info = do
               ChatCompletionResponse { choices } <- createCompletions info.url info.token
                 $ over ChatCompletionRequest
                     _
-                      { messages =
+                      { model = info.model
+                      , messages =
                           [ message system systemM
                           , message user userM
                           ]

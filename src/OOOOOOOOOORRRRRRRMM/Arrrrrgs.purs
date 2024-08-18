@@ -10,7 +10,8 @@ import Data.Newtype (class Newtype, un)
 import Data.Show.Generic (genericShow)
 import Yoga.JSON (class ReadForeign)
 
-newtype RCFile = RCFile { url :: Maybe String, token :: Maybe String }
+newtype RCFile = RCFile { url :: Maybe String, model :: Maybe String, token :: Maybe String }
+
 derive instance Newtype RCFile _
 derive newtype instance ReadForeign RCFile
 derive newtype instance Semigroup RCFile
@@ -31,6 +32,7 @@ type Migrate =
   , yes :: Boolean
   , tries :: Int
   , url :: String
+  , model :: String
   , token :: Maybe String
   }
 
@@ -44,6 +46,7 @@ type Query =
   , migrations :: String
   , yes :: Boolean
   , url :: String
+  , model :: String
   , token :: Maybe String
   }
 
@@ -53,6 +56,7 @@ type PureScript =
   , ps :: String
   , prefix :: String
   , url :: String
+  , model :: String
   , token :: Maybe String
   }
 
@@ -62,6 +66,7 @@ type Typescript =
   , ts :: String
   , validator :: Maybe Validator
   , url :: String
+  , model :: String
   , token :: Maybe String
   }
 
@@ -70,6 +75,7 @@ type Schema =
   , path :: String
   , humanReadable :: Boolean
   , url :: String
+  , model :: String
   , token :: Maybe String
   }
 
@@ -77,6 +83,7 @@ type Question =
   { migrations :: String
   , question :: String
   , url :: String
+  , model :: String
   , token :: Maybe String
   }
 
@@ -131,6 +138,11 @@ migrate rc = command [ "migrate", "m" ] "Create migrations." do
           [ "--url", "-u" ]
           "The url to run the query against."
           # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , model:
+        argument
+          [ "--model", "-ml" ]
+          "The model to use."
+          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
     , token:
         argument
           [ "--token", "-t" ]
@@ -176,6 +188,11 @@ query rc = command [ "query", "q" ] "Create queries." do
           [ "--url", "-u" ]
           "The url to run the query against."
           # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , model:
+        argument
+          [ "--model", "-ml" ]
+          "The model to use."
+          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
     , token:
         argument
           [ "--token", "-t" ]
@@ -206,6 +223,11 @@ pureScript rc = command [ "purescript", "ps" ] "Create purescript bindings." do
           [ "--url", "-u" ]
           "The url to run the query against."
           # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , model:
+        argument
+          [ "--model", "-ml" ]
+          "The model to use."
+          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
     , token:
         argument
           [ "--token", "-t" ]
@@ -242,11 +264,17 @@ typescript rc = command [ "typescript", "ts" ] "Create typescript bindings." do
           [ "--url", "-u" ]
           "The url to run the query against."
           # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , model:
+        argument
+          [ "--model", "-ml" ]
+          "The model to use."
+          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
     , token:
         argument
           [ "--token", "-t" ]
           "The bearer token for authentication"
-          # optional <#> (_ <|> (un RCFile rc).token)
+          # optional
+          <#> (_ <|> (un RCFile rc).token)
     , ts:
         argument
           [ "--path", "-p" ]
@@ -287,6 +315,11 @@ schema rc = command [ "schema", "s" ] "Export the schema." do
           [ "--url", "-u" ]
           "The url to run the query against."
           # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , model:
+        argument
+          [ "--model", "-ml" ]
+          "The model to use."
+          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
     , token:
         argument
           [ "--token", "-t" ]
@@ -312,6 +345,11 @@ question rc = command [ "ask", "a" ] "Ask a question." do
           [ "--url", "-u" ]
           "The url to run the query against."
           # default (fromMaybe "https://api.openai.com/v1/chat/completions" (un RCFile rc).url)
+    , model:
+        argument
+          [ "--model", "-ml" ]
+          "The model to use."
+          # default (fromMaybe "gpt-4o" (un RCFile rc).url)
     , token:
         argument
           [ "--token", "-t" ]

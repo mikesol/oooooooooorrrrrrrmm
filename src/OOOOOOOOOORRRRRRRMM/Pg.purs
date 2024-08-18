@@ -35,11 +35,12 @@ newtype Port = Port Int
 newtype User = User String
 newtype Database = Database String
 newtype ConnectionString = ConnectionString String
+
 newClientCS :: ConnectionString -> Aff Client
 newClientCS cs = makeAff \f -> do
   newClientConnectionStringImpl (f <<< Left) (f <<< Right) cs
   mempty
-  
+
 newClient :: Host -> Port -> User -> Database -> Aff Client
 newClient host port string database = makeAff \f -> do
   newClientImpl (f <<< Left) (f <<< Right) host port string database

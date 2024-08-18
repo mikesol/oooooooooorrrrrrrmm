@@ -48,11 +48,13 @@ WHERE g.name = 'Thor';
 
 This query selects the full names and areas of expertise of anthropologists who specialize in researching Thor.
 """
-  , C.message C.user """--raw
+  , C.message C.user
+      """--raw
 SELECT name, domain
 FROM favorite_ancient_norse_gods;
 """
-  , C.message C.assistant """That looks like a valid query! Here's the query you provided:
+  , C.message C.assistant
+      """That looks like a valid query! Here's the query you provided:
 
 ```sql
 SELECT name, domain
@@ -81,11 +83,13 @@ FROM favorite_ancient_norse_gods;
 
 This query sums up all the values in the `worshipers_count` column and returns the total number of worshipers across all gods.
 """
-  , C.message C.user """--raw
+  , C.message C.user
+      """--raw
 SELECT name, worshipers_count
 favorite_ancient_norse_gods;
 """
-  , C.message C.assistant """It looks like you're missing a `FROM` clause in your query. It looks like the query is missing the FROM keyword, which specifies the table you're selecting from. Here's the corrected query:
+  , C.message C.assistant
+      """It looks like you're missing a `FROM` clause in your query. It looks like the query is missing the FROM keyword, which specifies the table you're selecting from. Here's the corrected query:
 
 ```sql
 SELECT name, worshipers_count

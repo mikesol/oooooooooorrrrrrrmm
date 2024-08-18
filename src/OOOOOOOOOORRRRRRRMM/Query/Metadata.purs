@@ -1,4 +1,4 @@
-module  OOOOOOOOOORRRRRRRMM.Query.Metadata where
+module OOOOOOOOOORRRRRRRMM.Query.Metadata where
 
 import Data.Maybe (Maybe)
 import Yoga.JSON (class ReadForeign, class WriteForeign)

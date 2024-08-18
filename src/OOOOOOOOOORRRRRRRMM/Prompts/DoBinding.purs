@@ -251,14 +251,17 @@ VALUES ('Loki', $2, $1);
     }
   },
   "output": {}
-}""", C.message C.user $ user $ Query
+}"""
+  , C.message C.user $ user $ Query
       """SELECT *
 FROM obscure_norse_god_research_papers p
 JOIN anthropologists_researching_ancient_norse_gods a ON p.anthropologist_id = a.id
 JOIN favorite_ancient_norse_gods g ON a.favorite_god_id = g.id
 WHERE a.full_name = 'Jane Doe' AND g.name = 'Odin';
 
-""", C.message C.assistant $ assistant $ Json """{
+"""
+  , C.message C.assistant $ assistant $ Json
+      """{
   "input": {
     "full_name": {
       "type": "varchar",

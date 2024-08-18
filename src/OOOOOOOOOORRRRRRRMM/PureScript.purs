@@ -100,8 +100,11 @@ codegen moduleName query (PostgresQuerySchema { input: input, output: output }) 
     else "type I = { "
       <> String.joinWith ",\n"
         ( map
-            ( \(k /\ (InputParameter v)) -> let needsParens = v.is_nullable && v.is_array in
-                "  " <> k <> " :: " <> (if v.is_array then "Array " else "") <> (if needsParens then "(" else "") <> (if v.is_nullable then "Maybe " else "") <> toPsType v.type <> (if needsParens then ")" else "")
+            ( \(k /\ (InputParameter v)) ->
+                let
+                  needsParens = v.is_nullable && v.is_array
+                in
+                  "  " <> k <> " :: " <> (if v.is_array then "Array " else "") <> (if needsParens then "(" else "") <> (if v.is_nullable then "Maybe " else "") <> toPsType v.type <> (if needsParens then ")" else "")
             )
             (Object.toUnfoldable input)
         )
@@ -112,8 +115,11 @@ codegen moduleName query (PostgresQuerySchema { input: input, output: output }) 
     else "type O = Array { "
       <> String.joinWith ",\n"
         ( map
-            ( \(k /\ (OutputColumn v)) -> let needsParens = v.is_nullable && v.is_array in
-                "  " <> k <> " :: " <> (if v.is_array then "Array " else "") <> (if needsParens then "(" else "") <> (if v.is_nullable then "Maybe " else "") <> toPsType v.type <> (if needsParens then ")" else "")
+            ( \(k /\ (OutputColumn v)) ->
+                let
+                  needsParens = v.is_nullable && v.is_array
+                in
+                  "  " <> k <> " :: " <> (if v.is_array then "Array " else "") <> (if needsParens then "(" else "") <> (if v.is_nullable then "Maybe " else "") <> toPsType v.type <> (if needsParens then ")" else "")
             )
             (Object.toUnfoldable output)
         )
@@ -259,7 +265,7 @@ pureScript info = do
           let rawQueryPath = Path.concat [ info.queries, "__raw", q ]
           log $ "Reading query from " <> rawQueryPath
           rawQueryText <- readTextFile Encoding.UTF8 rawQueryPath
-          let systemM = DoBinding.system (DoBinding.Schema schema) 
+          let systemM = DoBinding.system (DoBinding.Schema schema)
           let moduleFileName = pascalCase q
           let moduleName = info.prefix <> "." <> pascalCase q
           let userM = DoBinding.user (DoBinding.Query rawQueryText)
@@ -268,7 +274,8 @@ pureScript info = do
               ChatCompletionResponse { choices } <- createCompletions info.url info.token
                 $ over ChatCompletionRequest
                     _
-                      { messages =
+                      { model = info.model
+                      , messages =
                           [ message system systemM
                           , message user userM
                           ]

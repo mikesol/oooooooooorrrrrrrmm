@@ -62,7 +62,7 @@ bootstrapTmp info = do
   let rawM = Path.concat [ info.migrations, "__raw" ]
   rawMExists <- liftEffect $ exists rawM
   rawMigrations' <- if not rawMExists then pure [] else readdir rawM
-  let (rawMigrations :: Array Int )= Array.sort $ compact $ map readJSON_ rawMigrations'
+  let (rawMigrations :: Array Int) = Array.sort $ compact $ map readJSON_ rawMigrations'
   log "Starting postgres 🤓"
   url <- makeAff \f -> do
     void $ exec' (startInstanceCmd info.args) identity \{ error: e, stdout } -> case e of

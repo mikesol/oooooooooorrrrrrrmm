@@ -81,7 +81,7 @@ goQ
 goQ migrationIx info schema migrationResult { todo, done } = Array.head todo # maybe (pure $ Done $ Right done) \queryPath -> do
   log $ "Potentially revising query in " <> queryPath
   let rawQueryFile = Path.concat [ info.queries, "__raw", queryPath ]
-  let metaPath = Path.concat [ info.queries, "__meta", queryPath  ]
+  let metaPath = Path.concat [ info.queries, "__meta", queryPath ]
   queryText <- readTextFile Encoding.UTF8 rawQueryFile
   let intentionFile = Path.concat [ info.queries, queryPath ]
   intentionText <- readTextFile Encoding.UTF8 intentionFile
@@ -95,7 +95,8 @@ goQ migrationIx info schema migrationResult { todo, done } = Array.head todo # m
   ChatCompletionResponse { choices } <- createCompletions info.url info.token
     $ over ChatCompletionRequest
         _
-          { messages =
+          { model = info.model
+          , messages =
               [ message system systemM
               , message user userM
               ]
@@ -192,7 +193,7 @@ migrate info = do
         Just migrationIx -> do
           let migrationPath = Path.concat [ info.migrations, show migrationIx ]
           migrationText <- readTextFile Encoding.UTF8 migrationPath
-          let systemM = DoMigration.system (DoMigration.Sql schema) 
+          let systemM = DoMigration.system (DoMigration.Sql schema)
           let userM = DoMigration.user (DoMigration.Ask migrationText)
           let isRaw = String.take 6 migrationText == "--raw\n"
           let
@@ -203,7 +204,8 @@ migrate info = do
                   ChatCompletionResponse { choices } <- createCompletions info.url info.token
                     $ over ChatCompletionRequest
                         _
-                          { messages =
+                          { model = info.model
+                          , messages =
                               [ message system systemM
                               , message user userM
                               ]
@@ -234,7 +236,7 @@ Press y or Y to accept and any other key to reject: """
                         log "Oh noes! Please change your prompt and try again."
                         pure $ Done unit
                     | otherwise -> do
-                        log $ if info.yes then "Creating migration "<>writeJSON migrationIx<>" 📄\n<migration>\n" <> result <> "\n</migration>\n" else "Great! Creating migration 📄"
+                        log $ if info.yes then "Creating migration " <> writeJSON migrationIx <> " 📄\n<migration>\n" <> result <> "\n</migration>\n" else "Great! Creating migration 📄"
                         cmd <- try $ runSqlCommand client result mempty
                         case cmd of
                           Left _ -> do
@@ -292,6 +294,7 @@ Press y or Y to accept and any other key to reject: """
     , path: Path.concat [ info.schema, "schema.sql" ]
     , url: info.url
     , token: info.token
+    , model: info.model
     }
 
 foreign import checksum :: String -> String

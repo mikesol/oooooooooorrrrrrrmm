@@ -1,7 +1,7 @@
 module OOOOOOOOOORRRRRRRMM.Prompts.NorseGods where
 
-
-norseGods = """
+norseGods =
+  """
 CREATE TABLE favorite_ancient_norse_gods (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,

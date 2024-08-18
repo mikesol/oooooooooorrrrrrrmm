@@ -58,7 +58,7 @@ schema :: Schema -> Aff Unit
 schema info = do
   spExists <- liftEffect $ exists $ Path.dirname info.path
   when (not spExists) do
-    mkdir' (Path.dirname info.path) { mode: permsAll, recursive: true } 
+    mkdir' (Path.dirname info.path) { mode: permsAll, recursive: true }
   console <- liftEffect $ createConsoleInterface noCompletion
   migrationPaths <- readdir info.migrations
   let migrations = filterMap readJSON_ migrationPaths
@@ -68,7 +68,7 @@ schema info = do
   let rawM = Path.concat [ info.migrations, "__raw" ]
   rawMExists <- liftEffect $ exists rawM
   rawMigrations' <- if not rawMExists then pure [] else readdir rawM
-  let (rawMigrations :: Array Int )= Array.sort $ compact $ map readJSON_ rawMigrations'
+  let (rawMigrations :: Array Int) = Array.sort $ compact $ map readJSON_ rawMigrations'
   log "Starting postgres 🤓"
   url <- makeAff \f -> do
     void $ exec' startInstanceCmd identity \{ error: e, stdout } -> case e of
@@ -102,7 +102,8 @@ schema info = do
     ChatCompletionResponse { choices } <- createCompletions info.url info.token
       $ over ChatCompletionRequest
           _
-            { messages =
+            { model = info.model
+            , messages =
                 [ message system systemM
                 , message user userM
                 ]

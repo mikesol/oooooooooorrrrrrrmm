@@ -73,7 +73,8 @@ ALTER COLUMN discount_percentage TYPE DECIMAL(5, 4);
 ```
 """
   , C.message C.user "I need to add a new table to track the battles fought by the ancient Norse gods. The table should have the battle name, date of the battle, and the god involved. Can you help me create that?"
-  , C.message C.assistant """Sure! Here’s the migration script to create a new table called norse_god_battles:
+  , C.message C.assistant
+      """Sure! Here’s the migration script to create a new table called norse_god_battles:
 
 ```sql
 CREATE TABLE norse_god_battles (

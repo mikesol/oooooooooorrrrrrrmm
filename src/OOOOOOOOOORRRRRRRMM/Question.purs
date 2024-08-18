@@ -64,7 +64,7 @@ question info = do
   let rawM = Path.concat [ info.migrations, "__raw" ]
   rawMExists <- liftEffect $ exists rawM
   rawMigrations' <- if not rawMExists then pure [] else readdir rawM
-  let (rawMigrations :: Array Int )= Array.sort $ compact $ map readJSON_ rawMigrations'
+  let (rawMigrations :: Array Int) = Array.sort $ compact $ map readJSON_ rawMigrations'
   log "Starting postgres 🤓"
   url <- makeAff \f -> do
     void $ exec' startInstanceCmd identity \{ error: e, stdout } -> case e of
@@ -83,7 +83,7 @@ question info = do
     sql <- readTextFile Encoding.UTF8 migrationPath
     void $ runSqlCommand client sql mempty
   rn <- liftEffect $ randomInt 0 42424242
-  let schemaPath =  Path.concat [ "/tmp", "schema-" <> writeJSON rn <> ".sql" ] 
+  let schemaPath = Path.concat [ "/tmp", "schema-" <> writeJSON rn <> ".sql" ]
   makeAff \f -> do
     void $ exec' (pgDumpCmd parsed.database parsed.host parsed.port parsed.user schemaPath) identity $ \{ error: e } -> do
       case e of
@@ -96,7 +96,8 @@ question info = do
   ChatCompletionResponse { choices } <- createCompletions info.url info.token
     $ over ChatCompletionRequest
         _
-          { messages =
+          { model = info.model
+          , messages =
               [ message system systemM
               , message user userM
               ]

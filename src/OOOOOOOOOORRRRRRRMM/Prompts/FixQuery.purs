@@ -87,8 +87,8 @@ Explanation:
 - This query now works with the updated schema, ensuring compatibility with your new database structure.
 
 You can use this new query in your applications or reports to continue retrieving the same information in a way that's compatible with the updated schema.
-""",
-  C.message C.user
+"""
+  , C.message C.user
       """Hey! A while ago, I asked you to generate a postgres query based on the following prompt:
 
 ```prompt
@@ -115,8 +115,8 @@ FROM norse_god_battles;
 ```
 
 This query will give you a list of all battle names, but without the battle dates since that information is no longer available in the schema. If you need to track battle dates again in the future, you may want to consider adding a new column or table to store that information.
-""",
-  C.message C.user
+"""
+  , C.message C.user
       """Hey! A while ago, I asked you to generate a postgres query based on the following prompt:
 
 ```prompt
@@ -133,7 +133,9 @@ LIMIT 1;
 ```
 
 However, the DB has migrated since and I'm concerned that the query may be either incorrect or many not fully correspond to my original intention. Could you update it if it no longer corresponds to the db schema or to my original wishes? If nothing needs updating, just let me know.
-""",   C.message C.assistant """Your query is still valid! Here it is for reference:
+"""
+  , C.message C.assistant
+      """Your query is still valid! Here it is for reference:
 
 ```sql
 SELECT name, worshipers_count

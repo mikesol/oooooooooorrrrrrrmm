@@ -10,6 +10,7 @@ jobs:
     env:
       COMPLETIONS_URL: ${{ secrets.COMPLETIONS_URL }}
       COMPLETIONS_TOKEN: ${{ secrets.COMPLETIONS_TOKEN }}
+      COMPLETIONS_MODEL: ${{ secrets.COMPLETIONS_MODEL }}
     steps:
       - uses: actions/checkout@v4
 

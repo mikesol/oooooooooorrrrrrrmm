@@ -17,7 +17,7 @@ import OOOOOOOOOORRRRRRRMM.Checksum (checksum)
 import OOOOOOOOOORRRRRRRMM.Query.Metadata (Metadata(..))
 import Yoga.JSON (readJSON_, writeJSON)
 
-generateQueriesToRun :: (String ->String) -> _ -> _ -> String -> String -> Array Int -> Array String -> Array String -> Aff (Array (Maybe String))
+generateQueriesToRun :: (String -> String) -> _ -> _ -> String -> String -> Array Int -> Array String -> Array String -> Aff (Array (Maybe String))
 generateQueriesToRun makeFilename fff info meta rawQ migrations queryPaths rawQPaths = do
   mostRecentMigration <- readTextFile Encoding.UTF8 $ Path.concat [ info.migrations, "__raw", writeJSON (Array.length migrations - 1) ]
   let mostRecentMigrationChecksum = checksum mostRecentMigration

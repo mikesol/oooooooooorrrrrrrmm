@@ -29,9 +29,10 @@ import Yoga.JSON (readJSON_)
 configFile = "oooooooooorrrrrrrmm.config.json" :: String
 
 chooseEnv :: Object String -> RCFile -> RCFile
-chooseEnv env (RCFile { token, url }) = RCFile
+chooseEnv env (RCFile { token, url, model }) = RCFile
   { token: lookup "COMPLETIONS_TOKEN" env <|> token
   , url: lookup "COMPLETIONS_URL" env <|> url
+  , model: lookup "COMPLETIONS_MODEL" env <|> model
   }
 
 main :: Effect Unit

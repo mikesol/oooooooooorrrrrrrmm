@@ -35,9 +35,9 @@ preCommit info = do
   migrationFiles <- noRawNoMetaAndSorted <$> readdir migrationPath
   migrationMetaFiles <- noRawNoMetaAndSorted <$> readdir migrationMetaPath
   migrationRawFiles <- noRawNoMetaAndSorted <$> readdir migrationRawPath
-  queryFiles <- noRawNoMetaAndSorted <$>readdir queryPath
-  queryMetaFiles <-noRawNoMetaAndSorted <$> readdir queryMetaPath
-  queryRawFiles <- noRawNoMetaAndSorted <$>readdir queryRawPath
+  queryFiles <- noRawNoMetaAndSorted <$> readdir queryPath
+  queryMetaFiles <- noRawNoMetaAndSorted <$> readdir queryMetaPath
+  queryRawFiles <- noRawNoMetaAndSorted <$> readdir queryRawPath
   when ((migrationFiles /= migrationMetaFiles) || (migrationFiles /= migrationRawFiles)) do
     throwError $ error $
       """Migration files are inconsistent:

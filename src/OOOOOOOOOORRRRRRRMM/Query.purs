@@ -128,7 +128,8 @@ query info = do
           ChatCompletionResponse { choices } <- createCompletions info.url info.token
             $ over ChatCompletionRequest
                 _
-                  { messages =
+                  { model = info.model
+                  , messages =
                       [ message system systemM
                       , message user userM
                       ]
@@ -160,7 +161,7 @@ Press y or Y to accept and any other key to reject: """
                     log "Oh noes! Please change your prompt and try again."
                     pure $ Done unit
                 | otherwise -> do
-                    log $ if info.yes then "Creating query 🤔\n<query>\n"<>result<>"\n</query>\n" else "Great! Creating query 🤔"
+                    log $ if info.yes then "Creating query 🤔\n<query>\n" <> result <> "\n</query>\n" else "Great! Creating query 🤔"
                     -- now it's safe to write the query
                     let newQueryPath = Path.concat [ rawQ, q ]
                     let metaPath = Path.concat [ meta, q ]

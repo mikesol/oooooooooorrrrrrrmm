@@ -30,12 +30,23 @@ pnm i -D oooooooooorrrrrrrmm
 
 ## BYOCCA
 
-`oooooooooorrrrrrrmm` is Bring Your Own Chat Completions API. You can let `oooooooooorrrrrrrmm` know about it one of two ways:
+`oooooooooorrrrrrrmm` is Bring Your Own Chat Completions API. The GitHub Action end-to-end test in this repo runs against `gpt-4o`.
 
-- Setting the `COMPLETIONS_URL` environment variable with the endpoint of your completions API. Also set `COMPLETIONS_TOKEN` if you have an API token.
-- Create an `oooooooooorrrrrrrmm.config.json` with keys `"url"` and optionally `"token"`.
+You can let `oooooooooorrrrrrrmm` know about your chat completions api one of two ways:
 
-One good candidate for a completions API is the OpenAPI endpoint: `https://api.openai.com/v1/chat/completions`.
+### Environment variables
+
+Use the following environment variables to set up your completions api:
+
+| Variable | Description |
+| --- | --- |
+| `COMPLETIONS_URL` | The url of the completions API. |
+| `COMPLETIONS_MODEL` | The model to use, ie `mistralai/Mixtral-8x7B-Instruct-v0.1` |
+| `COMPLETIONS_TOKEN` | A bearer token, ie `sk-foo-bar` from Open AI. |
+
+### JSON config
+
+Create an `oooooooooorrrrrrrmm.config.json` with keys `"url"`, `"model"`, and optionally `"token"`.
 
 ## Usage
 
