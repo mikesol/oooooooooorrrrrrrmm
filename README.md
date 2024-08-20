@@ -25,7 +25,7 @@ yarn add -D oooooooooorrrrrrrmm
 or
 
 ```bash
-pnm i -D oooooooooorrrrrrrmm
+pnpm i -D oooooooooorrrrrrrmm
 ```
 
 ## BYOCCA
