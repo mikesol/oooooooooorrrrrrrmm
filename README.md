@@ -48,6 +48,8 @@ Use the following environment variables to set up your completions api:
 
 Create an `oooooooooorrrrrrrmm.config.json` with keys `"url"`, `"model"`, and optionally `"token"`.
 
+You can also add an `additionalHeaders` object in the JSON to provide additional headers, for example if you're using [Claude messages](https://docs.anthropic.com/en/api/messages).
+
 ## Usage
 
 The following commands are written in `pnpm` style. `yarn` works the same way. For `npm`, use `npx`.
