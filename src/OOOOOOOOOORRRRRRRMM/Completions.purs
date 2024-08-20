@@ -18,15 +18,16 @@ import Data.Maybe (Maybe, maybe)
 import Data.Newtype (class Newtype)
 import Data.Tuple.Nested ((/\))
 import Effect.Aff (Aff, error, throwError)
-import Foreign.Object (fromFoldable)
+import Foreign.Object (Object, fromFoldable)
+import Foreign.Object as Object
 import Yoga.Fetch (URL(..), fetch, json, postMethod, statusCode)
 import Yoga.Fetch.Impl.Node (nodeFetch)
 import Yoga.JSON (class ReadForeign, class WriteForeign, read, writeJSON)
 
-createCompletions :: String -> Maybe String -> ChatCompletionRequest -> Aff ChatCompletionResponse
-createCompletions url token request = do
+createCompletions :: String -> Maybe String -> Object String -> ChatCompletionRequest -> Aff ChatCompletionResponse
+createCompletions url token additionalHeaders request = do
   let
-    headers = fromFoldable
+    headers = Object.union additionalHeaders $ fromFoldable
       $ [ "Content-Type" /\ "application/json" ] <> maybe [] (\t -> [ "Authorization" /\ ("Bearer " <> t) ]) token
   let err = append ("Failed to parse response at url " <> url <> " with headers " <> writeJSON headers <> " :: ")
   r <- fetch

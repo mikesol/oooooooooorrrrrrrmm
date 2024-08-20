@@ -12,7 +12,15 @@ generated-docs/
 .spago
 src/
 test/
-oooooooooorrrrrrrmm.config.json
+# for local development
 migrations/
-schema/
+# for local development
 queries/
+# for local development
+context/
+# for local development
+schema/
+# for local development
+typescript/
+# for local development
+oooooooooorrrrrrrmm.config.json

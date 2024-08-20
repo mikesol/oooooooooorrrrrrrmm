@@ -99,7 +99,7 @@ schema info = do
     sc <- readTextFile Encoding.UTF8 schemaPath
     let systemM = DoSchema.system
     let userM = DoSchema.user (DoSchema.Schema sc)
-    ChatCompletionResponse { choices } <- createCompletions info.url info.token
+    ChatCompletionResponse { choices } <- createCompletions info.url info.token info.additionalHeaders
       $ over ChatCompletionRequest
           _
             { model = info.model

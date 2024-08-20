@@ -92,7 +92,7 @@ goQ migrationIx info schema migrationResult { todo, done } = Array.head todo # m
     else pure Nothing
   let systemM = FixQuery.system (FixQuery.Sql schema) (FixQuery.Migration migrationResult)
   let userM = FixQuery.user (FixQuery.Intention intentionText) (FixQuery.Query queryText) context
-  ChatCompletionResponse { choices } <- createCompletions info.url info.token
+  ChatCompletionResponse { choices } <- createCompletions info.url info.token info.additionalHeaders
     $ over ChatCompletionRequest
         _
           { model = info.model
@@ -201,7 +201,7 @@ migrate info = do
               { result, success } <-
                 if isRaw then pure { result: migrationText, success: true }
                 else do
-                  ChatCompletionResponse { choices } <- createCompletions info.url info.token
+                  ChatCompletionResponse { choices } <- createCompletions info.url info.token info.additionalHeaders
                     $ over ChatCompletionRequest
                         _
                           { model = info.model
@@ -295,6 +295,7 @@ Press y or Y to accept and any other key to reject: """
     , url: info.url
     , token: info.token
     , model: info.model
+    , additionalHeaders: info.additionalHeaders
     }
 
 foreign import checksum :: String -> String

@@ -125,7 +125,7 @@ query info = do
           queryText <- readTextFile Encoding.UTF8 queryPath
           let systemM = DoQuery.system (DoQuery.Sql schema)
           let userM = DoQuery.user (DoQuery.Ask queryText)
-          ChatCompletionResponse { choices } <- createCompletions info.url info.token
+          ChatCompletionResponse { choices } <- createCompletions info.url info.token info.additionalHeaders
             $ over ChatCompletionRequest
                 _
                   { model = info.model

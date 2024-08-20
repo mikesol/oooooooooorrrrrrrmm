@@ -8,9 +8,19 @@ import Data.Generic.Rep (class Generic)
 import Data.Maybe (Maybe(..), fromMaybe)
 import Data.Newtype (class Newtype, un)
 import Data.Show.Generic (genericShow)
+import Foreign.Object (Object)
+import Foreign.Object as Object
+import Prim.Row (class Lacks)
+import Record (insert)
+import Type.Proxy (Proxy(..))
 import Yoga.JSON (class ReadForeign)
 
-newtype RCFile = RCFile { url :: Maybe String, model :: Maybe String, token :: Maybe String }
+newtype RCFile = RCFile
+  { url :: Maybe String
+  , model :: Maybe String
+  , token :: Maybe String
+  , additionalHeaders :: Maybe (Object String)
+  }
 
 derive instance Newtype RCFile _
 derive newtype instance ReadForeign RCFile
@@ -34,6 +44,7 @@ type Migrate =
   , url :: String
   , model :: String
   , token :: Maybe String
+  , additionalHeaders :: Object String
   }
 
 type PreCommit =
@@ -48,6 +59,7 @@ type Query =
   , url :: String
   , model :: String
   , token :: Maybe String
+  , additionalHeaders :: Object String
   }
 
 type PureScript =
@@ -58,6 +70,7 @@ type PureScript =
   , url :: String
   , model :: String
   , token :: Maybe String
+  , additionalHeaders :: Object String
   }
 
 type Typescript =
@@ -68,6 +81,7 @@ type Typescript =
   , url :: String
   , model :: String
   , token :: Maybe String
+  , additionalHeaders :: Object String
   }
 
 type Schema =
@@ -77,6 +91,7 @@ type Schema =
   , url :: String
   , model :: String
   , token :: Maybe String
+  , additionalHeaders :: Object String
   }
 
 type Question =
@@ -85,6 +100,7 @@ type Question =
   , url :: String
   , model :: String
   , token :: Maybe String
+  , additionalHeaders :: Object String
   }
 
 type BootstrapTmp = { args :: String, migrations :: String }
@@ -106,8 +122,11 @@ derive instance Generic Arrrrrgs _
 instance Show Arrrrrgs where
   show = genericShow
 
+addAdditionalHeaders :: forall i. Lacks "additionalHeaders" i => RCFile -> { | i } -> { additionalHeaders :: Object String | i }
+addAdditionalHeaders (RCFile { additionalHeaders }) = insert (Proxy :: Proxy "additionalHeaders") $ fromMaybe Object.empty additionalHeaders
+
 migrate ∷ RCFile -> ArgParser Migrate
-migrate rc = command [ "migrate", "m" ] "Create migrations." do
+migrate rc = addAdditionalHeaders rc <$> command [ "migrate", "m" ] "Create migrations." do
   flagHelp *> fromRecord
     { migrations:
         argument
@@ -171,7 +190,7 @@ preCommit = command [ "pre-commit", "pc" ] "A pre-commit hook" do
     }
 
 query ∷ RCFile -> ArgParser Query
-query rc = command [ "query", "q" ] "Create queries." do
+query rc = addAdditionalHeaders rc <$> command [ "query", "q" ] "Create queries." do
   flagHelp *> fromRecord
     { queries:
         argument
@@ -206,7 +225,7 @@ query rc = command [ "query", "q" ] "Create queries." do
     }
 
 pureScript ∷ RCFile -> ArgParser PureScript
-pureScript rc = command [ "purescript", "ps" ] "Create purescript bindings." do
+pureScript rc = addAdditionalHeaders rc <$> command [ "purescript", "ps" ] "Create purescript bindings." do
   flagHelp *> fromRecord
     { queries:
         argument
@@ -247,7 +266,7 @@ pureScript rc = command [ "purescript", "ps" ] "Create purescript bindings." do
     }
 
 typescript ∷ RCFile -> ArgParser Typescript
-typescript rc = command [ "typescript", "ts" ] "Create typescript bindings." do
+typescript rc = addAdditionalHeaders rc <$> command [ "typescript", "ts" ] "Create typescript bindings." do
   flagHelp *> fromRecord
     { queries:
         argument
@@ -293,7 +312,7 @@ typescript rc = command [ "typescript", "ts" ] "Create typescript bindings." do
     }
 
 schema ∷ RCFile -> ArgParser Schema
-schema rc = command [ "schema", "s" ] "Export the schema." do
+schema rc = addAdditionalHeaders rc <$> command [ "schema", "s" ] "Export the schema." do
   flagHelp *> fromRecord
     { path:
         argument
@@ -329,7 +348,7 @@ schema rc = command [ "schema", "s" ] "Export the schema." do
     }
 
 question ∷ RCFile -> ArgParser Question
-question rc = command [ "ask", "a" ] "Ask a question." do
+question rc = addAdditionalHeaders rc <$> command [ "ask", "a" ] "Ask a question." do
   flagHelp *> fromRecord
     { question:
         argument

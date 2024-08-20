@@ -271,7 +271,7 @@ pureScript info = do
           let userM = DoBinding.user (DoBinding.Query rawQueryText)
           let
             getResult = do
-              ChatCompletionResponse { choices } <- createCompletions info.url info.token
+              ChatCompletionResponse { choices } <- createCompletions info.url info.token info.additionalHeaders
                 $ over ChatCompletionRequest
                     _
                       { model = info.model
