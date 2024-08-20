@@ -25,6 +25,7 @@ workspace:
         - node-readline
         - prelude
         - random
+        - record
         - safe-coerce
         - strings
         - strings-extra
